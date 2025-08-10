@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}{{ issue.title }} - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('index') }}">仓库列表</a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="{{ url_for('repo_issues', repo_full_name=repo_name) }}">{{ repo_name }}</a>
+            <span class="breadcrumb-separator">/</span>
+            <span>Issue #{{ issue.number }}</span>
+        </div>
+    </div>
+
+    <!-- Issue 详情 -->
+    <div class="issue-detail">
+        <div class="issue-header">
+            <div class="issue-title-section">
+                <h1 class="issue-title">{{ issue.title }}</h1>
+                <div class="issue-number-status">
+                    <span class="issue-number">#{{ issue.number }}</span>
+                    <span class="status-badge status-{{ issue.state }}">
+                        {% if issue.state == 'open' %}🟢 开放{% else %}🔴 已关闭{% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="issue-actions">
+                <a href="{{ issue.html_url }}" target="_blank" class="btn btn-primary">
+                    在 GitHub 查看
+                </a>
+            </div>
+        </div>
+
+        <div class="issue-meta">
+            <div class="issue-author">
+                <img src="{{ issue.user.avatar_url }}" alt="{{ issue.user.login }}" class="avatar">
+                <div class="author-info">
+                    <strong>{{ issue.user.login }}</strong>
+                    <div class="issue-time">
+                        创建于 {{ issue.created_at | datetime }}
+                        {% if issue.updated_at != issue.created_at %}
+                        · 更新于 {{ issue.updated_at | datetime }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            {% if issue.labels %}
+            <div class="issue-labels">
+                {% for label in issue.labels %}
+                <span class="label" data-color="{{ label.color }}">
+                    {{ label.name }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Issue 内容 -->
+        <div class="issue-body">
+            <div class="issue-content-display" id="issue-content-display">
+                {% if issue.body %}
+                    <div class="markdown-content">
+                        {{ issue.body | markdown | safe }}
+                    </div>
+                {% else %}
+                    <p class="no-description">没有描述</p>
+                {% endif %}
+            </div>
+            
+            <!-- Issue 编辑模块 -->
+            <div class="issue-edit-section" id="issue-edit-section" style="display: none;">
+                <div class="edit-tabs">
+                    <button class="tab-btn active" data-tab="write">编写</button>
+                    <button class="tab-btn" data-tab="preview">预览</button>
+                </div>
+                <div class="edit-content">
+                    <div class="tab-panel active" id="write-panel">
+                        <textarea class="markdown-editor" id="issue-editor" placeholder="编写 Issue 内容...">{{ issue.body or '' }}</textarea>
+                    </div>
+                    <div class="tab-panel" id="preview-panel">
+                        <div class="markdown-content" id="preview-content"></div>
+                    </div>
+                </div>
+                <div class="edit-actions">
+                    <button class="btn btn-primary" id="save-issue-btn">保存更改</button>
+                    <button class="btn btn-outline" id="cancel-issue-edit-btn">取消</button>
+                </div>
+            </div>
+            
+            <!-- Issue 编辑按钮 -->
+            <div class="issue-actions-bottom">
+                <button class="btn btn-sm btn-outline" id="edit-issue-btn">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"></path>
+                    </svg>
+                    编辑
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加评论模块 -->
+    <div class="add-comment-section">
+        <div class="add-comment-container">
+            <div class="comment-author">
+                <img src="https://github.com/identicons/app/identicons/1.png" alt="Current User" class="avatar" id="current-user-avatar">
+            </div>
+            
+            <div class="add-comment-form">
+                <div class="comment-tabs">
+                    <button class="tab-btn active" data-tab="write" id="add-comment-write-tab">Write</button>
+                    <button class="tab-btn" data-tab="preview" id="add-comment-preview-tab">Preview</button>
+                </div>
+                
+                <div class="comment-input-container">
+                    <div class="tab-panel active" id="add-comment-write-panel">
+                        <textarea class="comment-textarea" id="add-comment-textarea" placeholder="Add a comment..."></textarea>
+                        
+                        <!-- Markdown 工具栏 -->
+                        <div class="markdown-toolbar">
+                            <div class="toolbar-group">
+                                <button type="button" class="toolbar-btn" data-action="bold" title="Bold">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M4 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5a3.5 3.5 0 0 0 1.852-6.47A3.5 3.5 0 0 0 8.5 2H4Zm4.5 5a1.5 1.5 0 1 1 0-3H5v3h3.5ZM5 9v3h4.5a1.5 1.5 0 1 1 0-3H5Z"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-action="italic" title="Italic">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M6 2.75A.75.75 0 0 1 6.75 2h6.5a.75.75 0 0 1 0 1.5h-2.505l-3.858 9H9.25a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.505l3.858-9H6.75A.75.75 0 0 1 6 2.75Z"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-action="code" title="Code">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-action="link" title="Link">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-panel" id="add-comment-preview-panel">
+                        <div class="comment-preview" id="add-comment-preview">
+                            <p class="preview-placeholder">Nothing to preview</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="comment-actions-footer">
+                    <div class="comment-help">
+                        <!-- 移除了文件上传提示文本 -->
+                    </div>
+                    
+                    <div class="comment-submit-actions">
+                        <button type="button" class="btn btn-primary" id="submit-comment-btn" disabled>
+                            Comment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 评论列表 -->
+    <div class="comments-section">
+        <h2 class="comments-title">
+            评论 ({{ comments|length }})
+        </h2>
+        
+        {% if comments %}
+            <div class="comments-list">
+                {% for comment in comments %}
+                <div class="comment-item">
+                    <div class="comment-author">
+                        <img src="{{ comment.user.avatar_url }}" alt="{{ comment.user.login }}" class="avatar">
+                    </div>
+                    
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <div class="comment-meta">
+                                <strong class="comment-author-name">{{ comment.user.login }}</strong>
+                                <span class="comment-time">{{ comment.created_at | datetime }}</span>
+                                {% if comment.updated_at != comment.created_at %}
+                                <span class="comment-edited">已编辑</span>
+                                {% endif %}
+                            </div>
+                            <div class="comment-menu">
+                                <button class="comment-menu-btn" data-comment-id="{{ comment.id }}" data-comment-index="{{ loop.index }}">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM1.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm13 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>
+                                    </svg>
+                                </button>
+                                <div class="comment-menu-dropdown" id="comment-menu-{{ loop.index }}" style="display: none;">
+                                    <button class="menu-item edit-comment-btn" data-comment-index="{{ loop.index }}">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"></path>
+                                        </svg>
+                                        编辑
+                                    </button>
+                                    <button class="menu-item delete-comment-btn" data-comment-id="{{ comment.id }}" data-comment-index="{{ loop.index }}">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.748 1.748 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"></path>
+                                        </svg>
+                                        删除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="comment-body">
+                            <div class="comment-content-display" id="comment-content-{{ loop.index }}">
+                                <div class="markdown-content">
+                                    {{ comment.body | markdown | safe }}
+                                </div>
+                            </div>
+                            
+                            <!-- 评论编辑模块 -->
+                            <div class="comment-edit-section" id="comment-edit-{{ loop.index }}" style="display: none;">
+                                <div class="edit-tabs">
+                                    <button class="tab-btn active" data-tab="write">编写</button>
+                                    <button class="tab-btn" data-tab="preview">预览</button>
+                                </div>
+                                <div class="edit-content">
+                                    <div class="tab-panel active" id="comment-write-panel-{{ loop.index }}">
+                                        <textarea class="markdown-editor" id="comment-editor-{{ loop.index }}" placeholder="编写评论内容...">{{ comment.body }}</textarea>
+                                    </div>
+                                    <div class="tab-panel" id="comment-preview-panel-{{ loop.index }}">
+                                        <div class="markdown-content" id="comment-preview-content-{{ loop.index }}"></div>
+                                    </div>
+                                </div>
+                                <div class="edit-actions">
+                                    <button class="btn btn-primary" id="save-comment-btn-{{ loop.index }}" data-comment-id="{{ comment.id }}">保存更改</button>
+                                    <button class="btn btn-outline" id="cancel-comment-edit-btn-{{ loop.index }}">取消</button>
+                                </div>
+                            </div>
+                            
+
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-comments">
+                <p>还没有评论</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/comments.js') }}"></script>
+<script src="{{ url_for('static', filename='js/markdown-editor.js') }}"></script>
+<script>
+// 获取当前用户头像
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/user')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data.avatar_url) {
+                const avatarImg = document.getElementById('current-user-avatar');
+                if (avatarImg) {
+                    avatarImg.src = data.data.avatar_url;
+                    avatarImg.alt = data.data.login || 'Current User';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('获取用户信息失败:', error);
+        });
+});
+</script>
+{% endblock %}

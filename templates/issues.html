@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ repo_name }} - Issues{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('index') }}">仓库列表</a>
+            <span class="breadcrumb-separator">/</span>
+            <span>{{ repo_name }}</span>
+        </div>
+        <h1>{{ repo_name }} - Issues</h1>
+    </div>
+
+    <!-- 筛选器 -->
+    <div class="filters-section">
+        <div class="filter-tabs">
+            <a href="?state=all" class="filter-tab {% if state == 'all' %}active{% endif %}">全部</a>
+            <a href="?state=open" class="filter-tab {% if state == 'open' %}active{% endif %}">开放</a>
+            <a href="?state=closed" class="filter-tab {% if state == 'closed' %}active{% endif %}">已关闭</a>
+        </div>
+    </div>
+
+    <!-- Issues 列表 -->
+    <div class="issues-section">
+        {% if issues %}
+            <div class="issues-list">
+                {% for issue in issues %}
+                <div class="issue-item">
+                    <div class="issue-status">
+                        <span class="status-badge status-{{ issue.state }}">
+                            {% if issue.state == 'open' %}🟢{% else %}🔴{% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="issue-content">
+                        <div class="issue-header">
+                            <h3 class="issue-title">
+                                <a href="{{ url_for('issue_detail', repo_full_name=repo_name, issue_number=issue.number) }}">
+                                    {{ issue.title }}
+                                </a>
+                            </h3>
+                            <span class="issue-number">#{{ issue.number }}</span>
+                        </div>
+                        
+                        {% if issue.body %}
+                        <div class="issue-body">
+                            <p>{{ issue.body | truncate(200) }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="issue-labels">
+                            {% for label in issue.labels %}
+                            <span class="label" data-color="{{ label.color }}">
+                                {{ label.name }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="issue-meta">
+                            <div class="issue-author">
+                                <img src="{{ issue.user.avatar_url }}" alt="{{ issue.user.login }}" class="avatar-sm">
+                                <span>{{ issue.user.login }}</span>
+                            </div>
+                            <span class="issue-time">创建于 {{ issue.created_at | datetime }}</span>
+                            {% if issue.comments_count > 0 %}
+                            <span class="issue-comments">
+                                <span class="comment-icon">💬</span>
+                                {{ issue.comments_count }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="issue-actions">
+                        <a href="{{ issue.html_url }}" target="_blank" class="btn btn-sm btn-outline">
+                            在 GitHub 查看
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- 分页 -->
+            <div class="pagination">
+                {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}&state={{ state }}" class="btn btn-outline">上一页</a>
+                {% endif %}
+                <span class="page-info">第 {{ current_page }} 页</span>
+                <a href="?page={{ current_page + 1 }}&state={{ state }}" class="btn btn-outline">下一页</a>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <h3>没有找到 Issues</h3>
+                <p>这个仓库目前没有 {% if state == 'open' %}开放的{% elif state == 'closed' %}已关闭的{% endif %} Issues</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/issues.js') }}"></script>
+{% endblock %}

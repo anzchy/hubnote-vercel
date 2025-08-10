@@ -1,0 +1,6 @@
+Flask==2.3.3
+requests==2.31.0
+PyGithub==1.59.1
+markdown==3.5.1
+python-dotenv==1.0.0
+Flask-CORS==4.0.0

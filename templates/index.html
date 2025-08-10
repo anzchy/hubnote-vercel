@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}GitNote - 仓库列表{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>GitHub 仓库管理</h1>
+        <p>添加 GitHub 仓库，查看和管理 Issues</p>
+    </div>
+
+    <!-- 添加仓库表单 -->
+    <div class="add-repo-section">
+        <h2>添加新仓库</h2>
+        <form method="POST" action="{{ url_for('add_repository') }}" class="add-repo-form">
+            <div class="form-group">
+                <input type="text" 
+                       name="repo_url" 
+                       placeholder="输入 GitHub 仓库 URL 或 owner/repo 格式"
+                       class="form-input"
+                       required>
+                <button type="submit" class="btn btn-primary">添加仓库</button>
+            </div>
+            <div class="form-help">
+                <p>支持格式：</p>
+                <ul>
+                    <li>https://github.com/owner/repo</li>
+                    <li>owner/repo</li>
+                </ul>
+            </div>
+        </form>
+    </div>
+
+    <!-- 仓库列表 -->
+    <div class="repos-section">
+        <h2>已添加的仓库 ({{ repos|length }})</h2>
+        
+        {% if repos %}
+            <div class="repos-grid">
+                {% for repo in repos %}
+                <div class="repo-card">
+                    <div class="repo-header">
+                        <h3 class="repo-name">
+                            <a href="{{ repo.url }}" target="_blank">{{ repo.full_name }}</a>
+                        </h3>
+                        <div class="repo-actions">
+                            <a href="{{ url_for('repo_issues', repo_full_name=repo.full_name) }}" 
+                               class="btn btn-sm btn-outline">查看 Issues</a>
+                            <a href="{{ url_for('remove_repository', repo_full_name=repo.full_name) }}" 
+                               class="btn btn-sm btn-danger"
+                               onclick="return confirm('确定要删除这个仓库吗？')">删除</a>
+                        </div>
+                    </div>
+                    
+                    {% if repo.description %}
+                    <p class="repo-description">{{ repo.description }}</p>
+                    {% endif %}
+                    
+                    <div class="repo-stats">
+                        <span class="stat-item">
+                            <span class="stat-icon">⭐</span>
+                            {{ repo.stars }}
+                        </span>
+                        <span class="stat-item">
+                            <span class="stat-icon">🍴</span>
+                            {{ repo.forks }}
+                        </span>
+                        <span class="stat-item">
+                            <span class="stat-icon">🐛</span>
+                            {{ repo.open_issues }} Issues
+                        </span>
+                        {% if repo.language %}
+                        <span class="stat-item">
+                            <span class="stat-icon">💻</span>
+                            {{ repo.language }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="repo-meta">
+                        <small class="text-muted">
+                            添加于 {{ repo.added_at | datetime }}
+                        </small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <h3>还没有添加任何仓库</h3>
+                <p>添加你的第一个 GitHub 仓库开始使用 GitNote</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/repo.js') }}"></script>
+{% endblock %}
