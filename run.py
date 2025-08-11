@@ -29,7 +29,7 @@ def main():
     
     # 检测是否为打包后的应用
     is_packaged = getattr(sys, '_MEIPASS', None) is not None
-    default_port = 5001 if is_packaged else 5000
+    default_port = 8889 if is_packaged else 8888
     
     parser.add_argument('--host', default='127.0.0.1', help='监听地址')
     parser.add_argument('--port', type=int, default=default_port, help='监听端口')

@@ -16,7 +16,7 @@ fi
 
 # 激活虚拟环境
 echo "📦 激活虚拟环境..."
-source gitnote-venv/bin/activate
+conda activate hubnote-env
 
 # 检查虚拟环境是否激活成功
 if [ $? -ne 0 ]; then

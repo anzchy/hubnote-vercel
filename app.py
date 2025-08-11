@@ -6,6 +6,7 @@ from utils.helpers import (
     load_repos, add_repo, remove_repo, 
     format_datetime, render_markdown, truncate_text, get_label_style
 )
+from utils.data_exporter import DataExporter
 import os
 import sys
 import json
@@ -310,6 +311,61 @@ def create_app(config_name=None):
         result = github_service.delete_comment(repo_full_name, comment_id)
         return jsonify(result)
     
+    @app.route('/api/export/repos', methods=['GET'])
+    def api_get_exportable_repos():
+        """获取可导出的仓库列表"""
+        try:
+            exporter = DataExporter(get_github_token())
+            repos = exporter.get_available_repos()
+            return jsonify({
+                'success': True,
+                'repos': repos
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'获取仓库列表失败: {str(e)}'
+            }), 500
+    
+    @app.route('/api/export/<path:repo_full_name>', methods=['POST'])
+    def api_export_repo_data(repo_full_name):
+        """导出仓库数据"""
+        try:
+            data = request.get_json() or {}
+            export_format = data.get('format', 'json').lower()
+            
+            # 验证导出格式
+            if export_format not in ['json', 'csv']:
+                return jsonify({
+                    'success': False,
+                    'error': f'不支持的导出格式: {export_format}'
+                }), 400
+            
+            # 执行导出
+            exporter = DataExporter(get_github_token())
+            result = exporter.export_repo_data(repo_full_name, export_format)
+            
+            if not result.get('success'):
+                return jsonify(result), 400
+            
+            # 返回文件内容
+            from flask import Response
+            response = Response(
+                result['content'],
+                mimetype=result['content_type'],
+                headers={
+                    'Content-Disposition': f'attachment; filename="{result["filename"]}"',
+                    'Content-Type': result['content_type']
+                }
+            )
+            return response
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'导出数据时发生错误: {str(e)}'
+            }), 500
+    
     # 错误处理
     @app.errorhandler(404)
     def not_found(error):
@@ -323,4 +379,4 @@ def create_app(config_name=None):
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8888)

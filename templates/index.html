@@ -33,7 +33,15 @@
 
     <!-- 仓库列表 -->
     <div class="repos-section">
-        <h2>已添加的仓库 ({{ repos|length }})</h2>
+        <div class="section-header">
+            <h2>已添加的仓库 ({{ repos|length }})</h2>
+            {% if repos %}
+            <button class="btn btn-primary" id="exportDataBtn">
+                <span class="btn-icon">📊</span>
+                导出数据
+            </button>
+            {% endif %}
+        </div>
         
         {% if repos %}
             <div class="repos-grid">
@@ -93,9 +101,57 @@
             </div>
         {% endif %}
     </div>
+
+    <!-- 数据导出模态框 -->
+    <div id="exportModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>导出仓库数据</h3>
+                <button class="modal-close" id="closeExportModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="exportRepoSelect">选择要导出的仓库：</label>
+                    <select id="exportRepoSelect" class="form-select">
+                        <option value="">请选择仓库...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="exportFormatSelect">选择导出格式：</label>
+                    <select id="exportFormatSelect" class="form-select">
+                        <option value="json">JSON (完整数据结构)</option>
+                        <option value="csv">CSV (Excel 兼容)</option>
+                    </select>
+                </div>
+                <div class="export-info" id="exportInfo" style="display: none;">
+                    <div class="info-item">
+                        <strong>仓库描述：</strong>
+                        <span id="repoDescription">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelExportBtn">取消</button>
+                <button class="btn btn-primary" id="confirmExportBtn" disabled>
+                    <span class="btn-icon">⬇️</span>
+                    开始导出
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导出进度提示 -->
+    <div id="exportProgress" class="progress-overlay" style="display: none;">
+        <div class="progress-content">
+            <div class="loading-spinner"></div>
+            <p>正在导出数据，请稍候...</p>
+            <small id="progressText">正在获取 Issues 和评论数据</small>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/repo.js') }}"></script>
+<script src="{{ url_for('static', filename='js/export.js') }}"></script>
 {% endblock %}

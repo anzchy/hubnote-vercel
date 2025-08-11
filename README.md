@@ -40,7 +40,7 @@ source activate_env.sh
 python3 -m venv gitnote-venv
 
 # 激活虚拟环境
-source gitnote-venv/bin/activate
+source hubnote-venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
