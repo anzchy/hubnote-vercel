@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}欢迎使用 HubNote{% endblock %}
+
+{% block extra_css %}
+<style>
+.setup-guide {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.guide-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.guide-header h1 {
+    font-size: 2.5rem;
+    color: #24292e;
+    margin-bottom: 1rem;
+}
+
+.guide-header .subtitle {
+    font-size: 1.2rem;
+    color: #586069;
+    margin-bottom: 2rem;
+}
+
+.setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.step {
+    background: #f6f8fa;
+    border-radius: 12px;
+    padding: 2rem;
+    border-left: 4px solid #0366d6;
+    position: relative;
+}
+
+.step-number {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: #0366d6;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.step h3 {
+    color: #24292e;
+    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+}
+
+.step p {
+    color: #586069;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.step ul {
+    margin-left: 1.5rem;
+    color: #586069;
+}
+
+.step li {
+    margin-bottom: 0.5rem;
+}
+
+.token-form {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1e4e8;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #24292e;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #0366d6;
+    box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+}
+
+.form-help {
+    font-size: 0.85rem;
+    color: #656d76;
+    margin-top: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: #0366d6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0256cc;
+}
+
+.btn-secondary {
+    background: #f6f8fa;
+    color: #24292e;
+    border: 1px solid #d0d7de;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #0366d6;
+    border: 1px solid #0366d6;
+}
+
+.btn-outline:hover {
+    background: #0366d6;
+    color: white;
+}
+
+.status-message {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.status-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.external-link {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+.external-link:hover {
+    text-decoration: underline;
+}
+
+.external-link::after {
+    content: " ↗";
+    font-size: 0.8rem;
+}
+
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.permission-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px solid #e1e4e8;
+    text-align: center;
+}
+
+.permission-name {
+    display: block;
+    font-family: monospace;
+    background: #f6f8fa;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.permission-desc {
+    font-size: 0.85rem;
+    color: #656d76;
+}
+
+@media (max-width: 768px) {
+    .setup-guide {
+        padding: 1rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="setup-guide">
+    <div class="guide-header">
+        <h1>🚀 欢迎使用 HubNote</h1>
+        <p class="subtitle">强大的 GitHub Issues 管理工具</p>
+        <div id="environment-notice">
+            <!-- 这里会动态显示环境信息 -->
+        </div>
+    </div>
+
+    <div class="setup-steps">
+        <!-- 步骤 1: 了解 GitHub Token -->
+        <div class="step">
+            <div class="step-number">1</div>
+            <h3>🔑 什么是 GitHub Personal Access Token？</h3>
+            <p>GitHub Personal Access Token 是一种安全的方式来访问 GitHub API，而无需使用您的密码。它就像是一把特殊的钥匙，只允许访问您指定的功能。</p>
+            <p><strong>为什么需要它？</strong></p>
+            <ul>
+                <li>安全地访问您的 GitHub 仓库和 Issues</li>
+                <li>不需要存储您的 GitHub 密码</li>
+                <li>可以随时撤销或更新权限</li>
+                <li>支持访问私有仓库</li>
+            </ul>
+        </div>
+
+        <!-- 步骤 2: 创建 Token -->
+        <div class="step">
+            <div class="step-number">2</div>
+            <h3>🛠️ 创建您的 GitHub Token</h3>
+            <p>按照以下步骤在 GitHub 上创建一个新的 Personal Access Token：</p>
+            <ol>
+                <li>访问 <a href="https://github.com/settings/tokens" target="_blank" class="external-link">GitHub Token 设置页面</a></li>
+                <li>点击 <strong>"Generate new token (classic)"</strong></li>
+                <li>为您的 Token 起一个描述性的名称，比如 "HubNote App"</li>
+                <li>设置过期时间（建议选择 "30 days" 或 "60 days"）</li>
+                <li>选择以下权限（scopes）：</li>
+            </ol>
+            
+            <div class="permissions-grid">
+                <div class="permission-item">
+                    <span class="permission-name">repo</span>
+                    <span class="permission-desc">访问所有仓库（包括私有）</span>
+                </div>
+                <div class="permission-item">
+                    <span class="permission-name">public_repo</span>
+                    <span class="permission-desc">仅访问公开仓库</span>
+                </div>
+                <div class="permission-item">
+                    <span class="permission-name">read:user</span>
+                    <span class="permission-desc">读取用户信息</span>
+                </div>
+            </ol>
+            <p><strong>提示：</strong> 如果您只需要访问公开仓库，选择 "public_repo" 即可。如果需要访问私有仓库，请选择 "repo"。</p>
+        </div>
+
+        <!-- 步骤 3: 配置 Token -->
+        <div class="step">
+            <div class="step-number">3</div>
+            <h3>⚙️ 配置您的 Token</h3>
+            <p>将您刚刚创建的 GitHub Token 粘贴到下面的输入框中：</p>
+            
+            <div class="token-form">
+                <div class="form-group">
+                    <label for="github-token">
+                        <span>🔐 GitHub Personal Access Token</span>
+                    </label>
+                    <input type="password" 
+                           id="github-token" 
+                           class="form-control" 
+                           placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    <div class="form-help">
+                        💡 您的 Token 会安全地保存在本地，不会发送到任何第三方服务器
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button id="save-token-btn" class="btn btn-primary">
+                        <span class="btn-text">💾 保存并开始使用</span>
+                        <span class="btn-loading" style="display: none;">保存中...</span>
+                    </button>
+                    <button id="test-token-btn" class="btn btn-secondary">
+                        <span class="btn-text">🧪 测试连接</span>
+                        <span class="btn-loading" style="display: none;">测试中...</span>
+                    </button>
+                </div>
+                
+                <div id="token-status" class="status-message" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- 步骤 4: 开始使用 -->
+        <div class="step">
+            <div class="step-number">4</div>
+            <h3>🎉 开始使用 HubNote</h3>
+            <p>配置完成后，您就可以：</p>
+            <ul>
+                <li>添加 GitHub 仓库到您的工作区</li>
+                <li>浏览和管理 Issues</li>
+                <li>查看和添加评论</li>
+                <li>导出数据进行分析</li>
+            </ul>
+            
+            <div style="margin-top: 1.5rem;">
+                <a href="{{ url_for('index') }}" class="btn btn-outline">
+                    ⬅️ 跳过设置，直接进入主页
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tokenInput = document.getElementById('github-token');
+    const saveBtn = document.getElementById('save-token-btn');
+    const testBtn = document.getElementById('test-token-btn');
+    const statusDiv = document.getElementById('token-status');
+    const environmentNotice = document.getElementById('environment-notice');
+    
+    // 检测是否在 Vercel 环境中
+    checkEnvironment();
+    
+    // 保存 Token
+    saveBtn.addEventListener('click', async function() {
+        const token = tokenInput.value.trim();
+        
+        if (!token) {
+            showStatus('请输入 GitHub Token', 'error');
+            return;
+        }
+        
+        if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+            showStatus('Token 格式似乎不正确。GitHub Token 通常以 "ghp_" 或 "github_pat_" 开头', 'error');
+            return;
+        }
+        
+        setLoading(saveBtn, true);
+        
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ token: token })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showStatus('✅ Token 保存成功！正在跳转到主页...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                showStatus('❌ ' + result.error, 'error');
+            }
+        } catch (error) {
+            showStatus('❌ 保存失败：' + error.message, 'error');
+        } finally {
+            setLoading(saveBtn, false);
+        }
+    });
+    
+    // 测试 Token
+    testBtn.addEventListener('click', async function() {
+        const token = tokenInput.value.trim();
+        
+        if (!token) {
+            showStatus('请输入 GitHub Token', 'error');
+            return;
+        }
+        
+        setLoading(testBtn, true);
+        
+        try {
+            // 直接测试 GitHub API
+            const response = await fetch('https://api.github.com/user', {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (response.ok) {
+                const user = await response.json();
+                showStatus(`✅ 连接成功！您好，${user.login}！`, 'success');
+            } else {
+                showStatus('❌ Token 无效或已过期', 'error');
+            }
+        } catch (error) {
+            showStatus('❌ 测试失败：' + error.message, 'error');
+        } finally {
+            setLoading(testBtn, false);
+        }
+    });
+    
+    // 回车键保存
+    tokenInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            saveBtn.click();
+        }
+    });
+    
+    function showStatus(message, type) {
+        statusDiv.textContent = message;
+        statusDiv.className = `status-message status-${type}`;
+        statusDiv.style.display = 'block';
+        
+        // 3秒后自动隐藏错误信息
+        if (type === 'error') {
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+    }
+    
+    function setLoading(button, loading) {
+        const textSpan = button.querySelector('.btn-text');
+        const loadingSpan = button.querySelector('.btn-loading');
+        
+        if (loading) {
+            textSpan.style.display = 'none';
+            loadingSpan.style.display = 'inline';
+            button.disabled = true;
+        } else {
+            textSpan.style.display = 'inline';
+            loadingSpan.style.display = 'none';
+            button.disabled = false;
+        }
+    }
+    
+    async function checkEnvironment() {
+        try {
+            // 检查是否在 Vercel 环境中
+            const response = await fetch('/api/config');
+            const config = await response.json();
+            
+            if (window.location.hostname.includes('vercel.app') || 
+                window.location.hostname.includes('.vercel.app')) {
+                // Vercel 环境
+                environmentNotice.innerHTML = `
+                    <div class="status-message status-info">
+                        <strong>🌐 您正在使用 Vercel 云端版本</strong><br>
+                        如果管理员已配置 GitHub Token，您可以直接开始使用。<br>
+                        如果需要更改配置，请联系管理员在 Vercel 控制台设置环境变量。
+                    </div>
+                `;
+                
+                // 检查是否已有有效的 token
+                if (config.has_token && config.token_valid) {
+                    environmentNotice.innerHTML += `
+                        <div class="status-message status-success" style="margin-top: 1rem;">
+                            ✅ GitHub Token 已配置且有效！<br>
+                            <a href="/" class="btn btn-primary" style="margin-top: 0.5rem;">🏠 进入主页</a>
+                        </div>
+                    `;
+                }
+            } else {
+                // 本地环境
+                environmentNotice.innerHTML = `
+                    <div class="status-message status-info">
+                        <strong>💻 您正在使用本地开发版本</strong><br>
+                        请按照下面的步骤配置您的 GitHub Token
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('检查环境失败:', error);
+            environmentNotice.innerHTML = `
+                <p>让我们用几个简单的步骤来设置您的账户</p>
+            `;
+        }
+    }
+});
+</script>
+{% endblock %}

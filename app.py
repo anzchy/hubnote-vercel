@@ -7,6 +7,11 @@ from utils.helpers import (
     format_datetime, render_markdown, truncate_text, get_label_style
 )
 from utils.data_exporter import DataExporter
+# 导入蓝图
+from api.repos import repos_bp
+from api.issues import issues_bp
+from api.comments import comments_bp
+from api.auth import auth_bp
 import os
 import sys
 import json
@@ -77,9 +82,19 @@ def create_app(config_name=None):
     # 启用 CORS
     CORS(app)
     
-    # 初始化 GitHub 服务
-    github_token = get_github_token()
-    github_service = GitHubService(github_token)
+    # 注册蓝图
+    app.register_blueprint(repos_bp)
+    app.register_blueprint(issues_bp)
+    app.register_blueprint(comments_bp)
+    app.register_blueprint(auth_bp)
+    
+    def get_github_service():
+        """获取当前用户的 GitHub 服务实例"""
+        from flask import session
+        github_token = session.get('github_token')
+        if not github_token:
+            return None
+        return GitHubService(github_token)
     
     # 模板过滤器
     @app.template_filter('datetime')
@@ -102,18 +117,38 @@ def create_app(config_name=None):
     @app.route('/')
     def index():
         """主页 - 显示仓库列表"""
-        # 检查是否有有效的 GitHub Token
-        if not github_service.token:
-            return redirect(url_for('config_page'))
+        from flask import session
+        from utils.storage import StorageManager
         
-        # 验证 Token 是否有效
+        # 检查用户是否已登录
+        if 'github_token' not in session or 'username' not in session:
+            return redirect(url_for('auth.login_page'))
+        
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            session.clear()
+            flash('GitHub 服务不可用，请重新登录', 'error')
+            return redirect(url_for('auth.login_page'))
+        
+        # 验证 Token 是否仍然有效
         success, _ = github_service.validate_token()
         if not success:
-            flash('GitHub Token 无效，请重新配置', 'error')
-            return redirect(url_for('config_page'))
+            session.clear()
+            flash('GitHub Token 已失效，请重新登录', 'error')
+            return redirect(url_for('auth.login_page'))
         
-        repos_data = load_repos()
-        return render_template('index.html', repos=repos_data['repositories'])
+        # 获取仓库数据
+        storage = StorageManager()
+        repos_data = storage.get_repos()
+        
+        # 获取用户数据
+        user_data = {
+            'username': session.get('username'),
+            'is_admin': session.get('is_admin', False)
+        }
+        
+        return render_template('index.html', repos=repos_data.get('repositories', []), user=user_data)
     
     @app.route('/config')
     def config_page():
@@ -123,27 +158,98 @@ def create_app(config_name=None):
     @app.route('/add_repo', methods=['POST'])
     def add_repository():
         """添加仓库"""
+        from utils.storage import StorageManager
+        from datetime import datetime
+        
         repo_url = request.form.get('repo_url', '').strip()
+        
+        # 调试信息
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"X-Requested-With: {request.headers.get('X-Requested-With')}")
+        print(f"Accept: {request.headers.get('Accept')}")
+        
+        is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 
+                  'application/json' in request.headers.get('Accept', ''))
+        
+        print(f"is_ajax: {is_ajax}")
+        
         if not repo_url:
+            if is_ajax:
+                return jsonify({'success': False, 'error': '请输入仓库 URL'}), 400
             flash('请输入仓库 URL', 'error')
             return redirect(url_for('index'))
+        
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            if is_ajax:
+                return jsonify({'success': False, 'error': '请先登录'}), 401
+            flash('请先登录', 'error')
+            return redirect(url_for('auth.login_page'))
         
         # 获取仓库信息
         result = github_service.get_repo_info(repo_url)
         if not result['success']:
+            if is_ajax:
+                return jsonify({'success': False, 'error': f'获取仓库信息失败: {result["error"]}'}), 400
             flash(f'获取仓库信息失败: {result["error"]}', 'error')
             return redirect(url_for('index'))
         
-        # 添加仓库
-        success, message = add_repo(result['data'])
-        flash(message, 'success' if success else 'error')
+        # 使用 StorageManager 添加仓库
+        storage = StorageManager()
+        repos_data = storage.get_repos()
+        
+        # 检查是否已存在
+        for repo in repos_data.get('repositories', []):
+            if repo.get('full_name') == result['data']['full_name']:
+                if is_ajax:
+                    return jsonify({'success': False, 'error': '仓库已存在'}), 400
+                flash('仓库已存在', 'error')
+                return redirect(url_for('index'))
+        
+        # 添加时间戳
+        result['data']['added_at'] = datetime.now().isoformat()
+        
+        # 确保 repositories 列表存在
+        if 'repositories' not in repos_data:
+            repos_data['repositories'] = []
+        
+        repos_data['repositories'].append(result['data'])
+        
+        # 保存到存储
+        if storage.save_repos(repos_data):
+            if is_ajax:
+                return jsonify({'success': True, 'message': '仓库添加成功', 'repo': result['data']})
+            flash('仓库添加成功', 'success')
+        else:
+            if is_ajax:
+                return jsonify({'success': False, 'error': '保存仓库信息失败'}), 500
+            flash('保存仓库信息失败', 'error')
+        
         return redirect(url_for('index'))
     
     @app.route('/remove_repo/<path:repo_full_name>')
     def remove_repository(repo_full_name):
         """删除仓库"""
-        success, message = remove_repo(repo_full_name)
-        flash(message, 'success' if success else 'error')
+        from utils.storage import StorageManager
+        
+        storage = StorageManager()
+        repos_data = storage.get_repos()
+        original_count = len(repos_data.get('repositories', []))
+        
+        repos_data['repositories'] = [
+            repo for repo in repos_data.get('repositories', [])
+            if repo.get('full_name') != repo_full_name
+        ]
+        
+        if len(repos_data['repositories']) < original_count:
+            if storage.save_repos(repos_data):
+                flash('仓库删除成功', 'success')
+            else:
+                flash('保存更改失败', 'error')
+        else:
+            flash('仓库不存在', 'error')
+        
         return redirect(url_for('index'))
     
     @app.route('/repo/<path:repo_full_name>/issues')
@@ -151,6 +257,12 @@ def create_app(config_name=None):
         """显示仓库的 Issues"""
         page = request.args.get('page', 1, type=int)
         state = request.args.get('state', 'all')
+        
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            flash('请先登录', 'error')
+            return redirect(url_for('auth.login_page'))
         
         # 获取 Issues
         result = github_service.get_issues(
@@ -173,6 +285,12 @@ def create_app(config_name=None):
     @app.route('/repo/<path:repo_full_name>/issue/<int:issue_number>')
     def issue_detail(repo_full_name, issue_number):
         """显示 Issue 详情"""
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            flash('请先登录', 'error')
+            return redirect(url_for('auth.login_page'))
+        
         # 获取 Issue 详情
         issue_result = github_service.get_issue_detail(repo_full_name, issue_number)
         if not issue_result['success']:
@@ -201,6 +319,14 @@ def create_app(config_name=None):
         page = request.args.get('page', 1, type=int)
         state = request.args.get('state', 'all')
         
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            return jsonify({
+                'success': False,
+                'error': '请先登录'
+            }), 401
+        
         result = github_service.get_issues(
             repo_full_name, 
             state=state, 
@@ -212,6 +338,13 @@ def create_app(config_name=None):
     @app.route('/api/validate_token')
     def api_validate_token():
         """验证 GitHub Token"""
+        github_service = get_github_service()
+        if not github_service:
+            return jsonify({
+                'success': False,
+                'message': '未登录或 Token 无效'
+            }), 401
+        
         success, message = github_service.validate_token()
         return jsonify({
             'success': success,
@@ -221,19 +354,23 @@ def create_app(config_name=None):
     @app.route('/api/config', methods=['GET'])
     def api_get_config():
         """获取配置信息"""
-        user_config = load_user_config()
+        from flask import session
+        github_service = get_github_service()
+        token_valid = bool(github_service and github_service.validate_token()[0]) if github_service else False
+        
         return jsonify({
-            'has_token': bool(user_config.get('github_token')),
-            'token_valid': bool(github_service.token and github_service.validate_token()[0])
+            'has_token': bool(session.get('github_token')),
+            'token_valid': token_valid
         })
     
     @app.route('/api/user', methods=['GET'])
     def api_get_current_user():
         """获取当前用户信息"""
-        if not github_service.token:
+        github_service = get_github_service()
+        if not github_service:
             return jsonify({
                 'success': False,
-                'error': '未配置 GitHub Token'
+                'error': '未登录或 Token 无效'
             }), 401
         
         result = github_service.get_current_user()
@@ -260,8 +397,6 @@ def create_app(config_name=None):
         user_config['github_token'] = token
         
         if save_user_config(user_config):
-            # 更新当前服务的 token
-            github_service.token = token
             return jsonify({'success': True, 'message': 'Token 保存成功'})
         else:
             return jsonify({'success': False, 'message': '保存配置失败'}), 500
@@ -276,6 +411,14 @@ def create_app(config_name=None):
                 'error': '缺少必要的参数'
             }), 400
         
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            return jsonify({
+                'success': False,
+                'error': '请先登录'
+            }), 401
+        
         result = github_service.update_issue(repo_full_name, issue_number, data['body'])
         return jsonify(result)
     
@@ -288,6 +431,14 @@ def create_app(config_name=None):
                 'success': False,
                 'error': '缺少必要的参数'
             }), 400
+        
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            return jsonify({
+                'success': False,
+                'error': '请先登录'
+            }), 401
         
         result = github_service.create_comment(repo_full_name, issue_number, data['body'])
         return jsonify(result)
@@ -302,14 +453,18 @@ def create_app(config_name=None):
                 'error': '缺少必要的参数'
             }), 400
         
+        # 获取 GitHub 服务实例
+        github_service = get_github_service()
+        if not github_service:
+            return jsonify({
+                'success': False,
+                'error': '请先登录'
+            }), 401
+        
         result = github_service.update_comment(repo_full_name, comment_id, data['body'])
         return jsonify(result)
     
-    @app.route('/api/repos/<path:repo_full_name>/issues/comments/<int:comment_id>', methods=['DELETE'])
-    def api_delete_comment(repo_full_name, comment_id):
-        """删除评论"""
-        result = github_service.delete_comment(repo_full_name, comment_id)
-        return jsonify(result)
+    # 删除评论路由已移至 api/comments.py
     
     @app.route('/api/export/repos', methods=['GET'])
     def api_get_exportable_repos():

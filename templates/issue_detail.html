@@ -8,7 +8,7 @@
         <div class="breadcrumb">
             <a href="{{ url_for('index') }}">仓库列表</a>
             <span class="breadcrumb-separator">/</span>
-            <a href="{{ url_for('repo_issues', repo_full_name=repo_name) }}">{{ repo_name }}</a>
+            <a href="{{ url_for('issues.repo_issues', repo_full_name=repo_name) }}">{{ repo_name }}</a>
             <span class="breadcrumb-separator">/</span>
             <span>Issue #{{ issue.number }}</span>
         </div>

@@ -1,4 +1,4 @@
-# GitNote 故障排除指南
+# HubNote 故障排除指南
 
 ## 🚨 常见问题解决方案
 
@@ -118,7 +118,7 @@ python test_repo_access.py https://github.com/facebook/react
 
 2. **生成新 Token**
    - 点击 "Generate new token" → "Generate new token (classic)"
-   - 设置 Token 名称（如 "GitNote App"）
+   - 设置 Token 名称（如 "HubNote App"）
    - 选择过期时间
 
 3. **设置权限范围**

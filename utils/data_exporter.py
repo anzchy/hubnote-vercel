@@ -249,8 +249,9 @@ class DataExporter:
             仓库列表，每个仓库包含 name、full_name、description 和 open_issues
         """
         try:
-            from utils.helpers import load_repos
-            repos_data = load_repos()
+            from utils.storage import StorageManager
+            storage = StorageManager()
+            repos_data = storage.get_repos()
             repositories = repos_data.get('repositories', [])
             
             return [{

@@ -126,7 +126,7 @@ def main():
     print("\n" + "="*60)
     if success:
         print("🎉 测试完成: 仓库访问正常")
-        print("\n现在您可以在 GitNote 应用中添加这个仓库了!")
+        print("\n现在您可以在 HubNote 应用中添加这个仓库了!")
     else:
         print("❌ 测试失败: 仓库访问异常")
         print("\n请根据上述建议解决问题后重试")

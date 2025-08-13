@@ -37,7 +37,7 @@
                     <div class="issue-content">
                         <div class="issue-header">
                             <h3 class="issue-title">
-                                <a href="{{ url_for('issue_detail', repo_full_name=repo_name, issue_number=issue.number) }}">
+                                <a href="{{ url_for('issues.issue_detail', repo_full_name=repo_name, issue_number=issue.number) }}">
                                     {{ issue.title }}
                                 </a>
                             </h3>

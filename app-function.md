@@ -376,7 +376,7 @@ def __init__(self, token=None):
 - 异步编程（Promise、async/await）
 - 表单验证
 - CSS 动画控制
-- 模块化设计（window.GitNote 命名空间）
+- 模块化设计（window.HubNote 命名空间）
 
 ### 2. static/js/repo.js - 仓库管理功能
 

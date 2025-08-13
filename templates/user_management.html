@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}用户管理{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>用户管理</h1>
+        <p class="text-muted">管理系统用户访问权限</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">添加用户</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('auth.add_user_to_whitelist') }}">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">GitHub 用户名</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="form-text">请输入要添加的 GitHub 用户名</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
+                                <label class="form-check-label" for="is_admin">
+                                    管理员权限
+                                </label>
+                                <div class="form-text">管理员可以管理用户白名单</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">添加用户</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">当前用户列表</h5>
+                </div>
+                <div class="card-body">
+                    {% if whitelist.allowed_users %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>权限</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in whitelist.allowed_users %}
+                                    <tr>
+                                        <td>{{ user }}</td>
+                                        <td>
+                                            {% if user in whitelist.admin_users %}
+                                                <span class="badge bg-danger">管理员</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">普通用户</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('auth.remove_user_from_whitelist') }}" style="display: inline;">
+                                                <input type="hidden" name="username" value="{{ user }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                        onclick="return confirm('确定要移除用户 {{ user }} 吗？')">
+                                                    移除
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-users fa-3x mb-3"></i>
+                            <p>暂无用户</p>
+                            <small>白名单为空时，所有用户都可以访问</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">使用说明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>权限说明</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> <strong>普通用户</strong>：可以登录系统，查看和管理自己的仓库</li>
+                                <li><i class="fas fa-crown text-warning"></i> <strong>管理员</strong>：除普通用户权限外，还可以管理用户白名单</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>安全提示</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-shield-alt text-primary"></i> 白名单为空时，所有用户都可以访问</li>
+                                <li><i class="fas fa-exclamation-triangle text-warning"></i> 请谨慎管理管理员权限</li>
+                                <li><i class="fas fa-info-circle text-info"></i> 用户名不区分大小写</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 自动刷新页面状态
+setInterval(function() {
+    // 可以在这里添加实时更新逻辑
+}, 30000);
+</script>
+{% endblock %}

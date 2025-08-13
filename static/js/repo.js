@@ -33,12 +33,12 @@ function initAddRepoForm() {
         const repoUrl = formData.get('repo_url').trim();
         
         if (!repoUrl) {
-            window.GitNote.showNotification('请输入仓库 URL', 'error');
+            window.HubNote.showNotification('请输入仓库 URL', 'error');
             return;
         }
         
         if (!isValidRepoUrl(repoUrl)) {
-            window.GitNote.showNotification('请输入有效的 GitHub 仓库 URL', 'error');
+            window.HubNote.showNotification('请输入有效的 GitHub 仓库 URL', 'error');
             return;
         }
         
@@ -60,27 +60,28 @@ function addRepository(repoUrl) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
         },
         body: `repo_url=${encodeURIComponent(repoUrl)}`
     })
-    .then(response => {
-        if (response.ok) {
-            window.GitNote.showNotification('仓库添加成功！', 'success');
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.HubNote.showNotification(data.message || '仓库添加成功！', 'success');
             // 清空表单
             document.getElementById('add-repo-form').reset();
-            // 刷新页面显示新添加的仓库
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // 动态添加新仓库到页面
+            addRepoToPage(data.repo);
+            // 更新仓库计数
+            updateRepoCount();
         } else {
-            return response.text().then(text => {
-                throw new Error(text || '添加仓库失败');
-            });
+            throw new Error(data.error || '添加仓库失败');
         }
     })
     .catch(error => {
         console.error('添加仓库失败:', error);
-        window.GitNote.showNotification(error.message || '添加仓库失败', 'error');
+        window.HubNote.showNotification(error.message || '添加仓库失败', 'error');
     })
     .finally(() => {
         // 恢复按钮状态
@@ -99,7 +100,7 @@ function initDeleteRepo() {
             const repoName = this.getAttribute('data-repo');
             const repoDisplayName = this.getAttribute('data-repo-name') || repoName;
             
-            window.GitNote.confirmAction(
+            window.HubNote.confirmAction(
                 `确定要删除仓库 "${repoDisplayName}" 吗？\n\n注意：这只会从本地列表中移除，不会影响 GitHub 上的仓库。`,
                 () => deleteRepository(repoName)
             );
@@ -118,7 +119,7 @@ function deleteRepository(repoName) {
     })
     .then(response => {
         if (response.ok) {
-            window.GitNote.showNotification('仓库删除成功！', 'success');
+            window.HubNote.showNotification('仓库删除成功！', 'success');
             // 移除对应的仓库卡片
             const repoCard = document.querySelector(`[data-repo="${repoName}"]`).closest('.repo-card');
             if (repoCard) {
@@ -137,7 +138,7 @@ function deleteRepository(repoName) {
     })
     .catch(error => {
         console.error('删除仓库失败:', error);
-        window.GitNote.showNotification(error.message || '删除仓库失败', 'error');
+        window.HubNote.showNotification(error.message || '删除仓库失败', 'error');
     });
 }
 
@@ -372,15 +373,107 @@ function isValidRepoUrl(url) {
 // 复制仓库链接
 function copyRepoLink(repoName) {
     const repoUrl = `https://github.com/${repoName}`;
-    window.GitNote.copyToClipboard(repoUrl);
+    window.HubNote.copyToClipboard(repoUrl);
+}
+
+// 动态添加仓库到页面
+function addRepoToPage(repo) {
+    const repoGrid = document.querySelector('.repos-grid');
+    const emptyState = document.querySelector('.empty-state');
+    
+    // 如果存在空状态提示，移除它
+    if (emptyState) {
+        emptyState.remove();
+    }
+    
+    // 创建新的仓库卡片
+    const repoCard = document.createElement('div');
+    repoCard.className = 'repo-card';
+    
+    const cardHtml = `
+        <div class="repo-header">
+            <h3 class="repo-name">
+                <a href="${repo.html_url || repo.url}" target="_blank">${repo.full_name}</a>
+            </h3>
+            <div class="repo-actions">
+                <a href="/repo/${repo.full_name}/issues" class="btn btn-sm btn-outline">查看 Issues</a>
+                <button class="btn btn-sm btn-danger delete-repo-btn" 
+                        data-repo="${repo.full_name}" 
+                        data-repo-name="${repo.name}" 
+                        onclick="return confirm('确定要删除这个仓库吗？')">
+                    删除
+                </button>
+            </div>
+        </div>
+        <p class="repo-full-name">${repo.full_name}</p>
+        <p class="repo-description">${repo.description || '暂无描述'}</p>
+        <div class="repo-stats">
+            <span class="stat-item">
+                <span class="stat-icon">⭐</span>
+                ${repo.stargazers_count || repo.stars || 0}
+            </span>
+            <span class="stat-item">
+                <span class="stat-icon">🍴</span>
+                ${repo.forks_count || repo.forks || 0}
+            </span>
+            <span class="stat-item">
+                <span class="stat-icon">🐛</span>
+                ${repo.open_issues_count || repo.open_issues || 0} Issues
+            </span>
+            ${repo.language ? `<span class="stat-item">
+                <span class="stat-icon">💻</span>
+                ${repo.language}
+            </span>` : ''}
+        </div>
+        <div class="repo-meta">
+            <small class="text-muted">
+                添加于 ${new Date(repo.added_at || Date.now()).toLocaleDateString()}
+            </small>
+        </div>
+    `;
+    
+    repoCard.innerHTML = cardHtml;
+    
+    if (repoGrid) {
+        repoGrid.appendChild(repoCard);
+        
+        // 重新初始化删除按钮事件
+        const deleteBtn = repoCard.querySelector('.delete-repo-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const repoName = this.getAttribute('data-repo');
+                const repoDisplayName = this.getAttribute('data-repo-name') || repoName;
+                
+                window.HubNote.confirmAction(
+                    `确定要删除仓库 "${repoDisplayName}" 吗？\n\n注意：这只会从本地列表中移除，不会影响 GitHub 上的仓库。`,
+                    () => deleteRepository(repoName)
+                );
+            });
+        }
+    }
+}
+
+// 更新仓库计数
+function updateRepoCount() {
+    const repoCards = document.querySelectorAll('.repo-card');
+    const countElement = document.querySelector('.page-title');
+    if (countElement && countElement.textContent.includes('仓库管理')) {
+        countElement.textContent = `仓库管理 (${repoCards.length})`;
+    }
+    
+    // 更新统计信息
+    updateRepoStats();
 }
 
 // 导出函数供全局使用
 window.RepoManager = {
-    addRepository,
     deleteRepository,
     filterRepositories,
     sortRepositories,
     copyRepoLink,
-    updateRepoStats
+    updateRepoStats,
+    addRepoToPage,
+    updateRepoCount
 };

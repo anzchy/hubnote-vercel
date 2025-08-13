@@ -393,8 +393,8 @@ function saveCommentChanges(commentIndex, commentId) {
     const issueNumber = pathParts[5];
     
     // 发送请求到后端更新评论
-    fetch(`/api/repos/${owner}/${repo}/issues/comments/${commentId}`, {
-        method: 'PATCH',
+    fetch(`/api/repos/${owner}/${repo}/comments/${commentId}`, {
+        method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
         },

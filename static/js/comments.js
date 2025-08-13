@@ -141,7 +141,7 @@ function initCommentActions() {
             const currentUrl = window.location.href.split('#')[0];
             const commentUrl = `${currentUrl}#comment-${commentId}`;
             
-            window.GitNote.copyToClipboard(commentUrl);
+            window.HubNote.copyToClipboard(commentUrl);
         });
     });
     
@@ -163,8 +163,8 @@ function initCommentActions() {
                 replyTextarea.value = quotedText;
                 replyTextarea.focus();
             } else {
-                window.GitNote.copyToClipboard(quotedText);
-                window.GitNote.showNotification('引用内容已复制到剪贴板', 'success');
+                window.HubNote.copyToClipboard(quotedText);
+        window.HubNote.showNotification('引用内容已复制到剪贴板', 'success');
             }
         });
     });
@@ -223,12 +223,12 @@ function showReplyBox(comment, replyToAuthor) {
     submitBtn.addEventListener('click', function() {
         const replyText = textarea.value.trim();
         if (!replyText) {
-            window.GitNote.showNotification('请输入回复内容', 'error');
+            window.HubNote.showNotification('请输入回复内容', 'error');
             return;
         }
         
         // 这里应该调用 API 发送回复，但由于是只读应用，我们只是显示提示
-        window.GitNote.showNotification('此应用为只读模式，无法发送回复。请前往 GitHub 进行回复。', 'info');
+        window.HubNote.showNotification('此应用为只读模式，无法发送回复。请前往 GitHub 进行回复。', 'info');
     });
     
     // 自动聚焦
@@ -284,7 +284,7 @@ function addCopyButton(codeBlock) {
     // 复制功能
     copyBtn.addEventListener('click', function() {
         const code = codeBlock.textContent;
-        window.GitNote.copyToClipboard(code);
+        window.HubNote.copyToClipboard(code);
         
         this.textContent = '已复制';
         setTimeout(() => {
@@ -652,8 +652,8 @@ function deleteComment(commentId, commentIndex) {
             }
             
             // 显示成功消息
-            if (window.GitNote && window.GitNote.showNotification) {
-                window.GitNote.showNotification('评论删除成功', 'success');
+            if (window.HubNote && window.HubNote.showNotification) {
+            window.HubNote.showNotification('评论删除成功', 'success');
             } else {
                 alert('评论删除成功');
             }
@@ -664,8 +664,8 @@ function deleteComment(commentId, commentIndex) {
             }, 1000);
         } else {
             // 删除失败
-            if (window.GitNote && window.GitNote.showNotification) {
-                window.GitNote.showNotification(data.message || '删除评论失败', 'error');
+            if (window.HubNote && window.HubNote.showNotification) {
+            window.HubNote.showNotification(data.message || '删除评论失败', 'error');
             } else {
                 alert(data.message || '删除评论失败');
             }
@@ -673,8 +673,8 @@ function deleteComment(commentId, commentIndex) {
     })
     .catch(error => {
         console.error('删除评论时发生错误:', error);
-        if (window.GitNote && window.GitNote.showNotification) {
-            window.GitNote.showNotification('删除评论时发生错误', 'error');
+        if (window.HubNote && window.HubNote.showNotification) {
+            window.HubNote.showNotification('删除评论时发生错误', 'error');
         } else {
             alert('删除评论时发生错误');
         }

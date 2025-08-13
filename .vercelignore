@@ -1,0 +1,75 @@
+# 开发和测试文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 本地开发文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 构建和分发文件
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 项目特定文件
+logs/
+data/repos.json
+*.md
+!VERCEL_DEPLOYMENT.md
+test_*.py
+HubNote.spec
+build_app.sh
+start_hubnote.sh
+activate_env.sh
+freeze.py
+gitnote-venv/
+hubnote-env/

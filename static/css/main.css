@@ -39,6 +39,7 @@ body {
 .nav-menu {
     display: flex;
     gap: 1rem;
+    align-items: center;
 }
 
 .nav-link {
@@ -47,6 +48,21 @@ body {
     padding: 0.5rem 1rem;
     border-radius: 4px;
     transition: background-color 0.2s;
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+.nav-username {
+    color: #f0f6fc;
+    font-weight: 500;
+    font-size: 0.9rem;
 }
 
 .nav-link:hover {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GitNote 应用启动脚本
+HubNote 应用启动脚本
 
 使用方法:
     python run.py

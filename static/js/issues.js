@@ -238,7 +238,7 @@ function loadPage(page) {
     
     // 显示加载状态
     const issuesList = document.querySelector('.issues-list');
-    window.GitNote.showLoading(issuesList);
+    window.HubNote.showLoading(issuesList);
     
     // 更新 URL 并重新加载
     window.history.pushState({}, '', currentUrl);
@@ -413,12 +413,12 @@ function displayIssueStats(stats) {
 // 复制 Issue 链接
 function copyIssueLink(repoName, issueNumber) {
     const issueUrl = `https://github.com/${repoName}/issues/${issueNumber}`;
-    window.GitNote.copyToClipboard(issueUrl);
+    window.HubNote.copyToClipboard(issueUrl);
 }
 
 // 刷新 Issues
 function refreshIssues() {
-    window.GitNote.showNotification('正在刷新 Issues...', 'info');
+    window.HubNote.showNotification('正在刷新 Issues...', 'info');
     window.location.reload();
 }
 

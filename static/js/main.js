@@ -311,7 +311,7 @@ function showNotification(message, type = 'info') {
 }
 
 // 导出全局函数
-window.GitNote = {
+window.HubNote = {
     formatDate,
     truncateText,
     apiCall,

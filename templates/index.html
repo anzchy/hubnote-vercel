@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}GitNote - 仓库列表{% endblock %}
+{% block title %}HubNote - 仓库列表{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -12,7 +12,7 @@
     <!-- 添加仓库表单 -->
     <div class="add-repo-section">
         <h2>添加新仓库</h2>
-        <form method="POST" action="{{ url_for('add_repository') }}" class="add-repo-form">
+        <form method="POST" action="{{ url_for('add_repository') }}" class="add-repo-form" id="add-repo-form">
             <div class="form-group">
                 <input type="text" 
                        name="repo_url" 
@@ -52,7 +52,7 @@
                             <a href="{{ repo.url }}" target="_blank">{{ repo.full_name }}</a>
                         </h3>
                         <div class="repo-actions">
-                            <a href="{{ url_for('repo_issues', repo_full_name=repo.full_name) }}" 
+                            <a href="{{ url_for('issues.repo_issues', repo_full_name=repo.full_name) }}" 
                                class="btn btn-sm btn-outline">查看 Issues</a>
                             <a href="{{ url_for('remove_repository', repo_full_name=repo.full_name) }}" 
                                class="btn btn-sm btn-danger"
@@ -97,7 +97,7 @@
             <div class="empty-state">
                 <div class="empty-icon">📚</div>
                 <h3>还没有添加任何仓库</h3>
-                <p>添加你的第一个 GitHub 仓库开始使用 GitNote</p>
+                <p>添加你的第一个 GitHub 仓库开始使用 HubNote</p>
             </div>
         {% endif %}
     </div>
