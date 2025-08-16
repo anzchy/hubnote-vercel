@@ -128,14 +128,14 @@ def create_app(config_name=None):
         github_service = get_github_service()
         if not github_service:
             session.clear()
-            flash('GitHub 服务不可用，请重新登录', 'error')
+            session['login_error'] = 'GitHub 服务不可用，请重新登录'
             return redirect(url_for('auth.login_page'))
         
         # 验证 Token 是否仍然有效
         success, _ = github_service.validate_token()
         if not success:
             session.clear()
-            flash('GitHub Token 已失效，请重新登录', 'error')
+            session['login_error'] = 'GitHub Token 已失效，请重新登录'
             return redirect(url_for('auth.login_page'))
         
         # 获取仓库数据
@@ -184,7 +184,7 @@ def create_app(config_name=None):
         if not github_service:
             if is_ajax:
                 return jsonify({'success': False, 'error': '请先登录'}), 401
-            flash('请先登录', 'error')
+            session['login_error'] = '请先登录'
             return redirect(url_for('auth.login_page'))
         
         # 获取仓库信息
@@ -261,7 +261,7 @@ def create_app(config_name=None):
         # 获取 GitHub 服务实例
         github_service = get_github_service()
         if not github_service:
-            flash('请先登录', 'error')
+            session['login_error'] = '请先登录'
             return redirect(url_for('auth.login_page'))
         
         # 获取 Issues
@@ -288,7 +288,7 @@ def create_app(config_name=None):
         # 获取 GitHub 服务实例
         github_service = get_github_service()
         if not github_service:
-            flash('请先登录', 'error')
+            session['login_error'] = '请先登录'
             return redirect(url_for('auth.login_page'))
         
         # 获取 Issue 详情

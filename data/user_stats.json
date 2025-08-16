@@ -1,0 +1,26 @@
+{
+  "user_stats": {
+    "anzchy": {
+      "login_count": 20,
+      "last_login": "2025-08-16T12:39:32.600036",
+      "first_login": "2025-08-11T00:00:00"
+    },
+    "hubnote": {
+      "login_count": 6,
+      "last_login": "2025-08-16T12:38:43.873961",
+      "first_login": "2025-08-16T10:00:00"
+    }
+  },
+  "daily_stats": {
+    "2025-08-16": {
+      "logins": 16
+    },
+    "2025-08-15": {
+      "logins": 5
+    },
+    "2025-08-14": {
+      "logins": 3
+    }
+  },
+  "total_logins": 31
+}

@@ -56,7 +56,7 @@ def add_repository():
                 'success': False,
                 'error': 'GitHub 服务不可用，请重新登录'
             }), 401
-        flash('GitHub 服务不可用，请重新登录', 'error')
+        session['login_error'] = 'GitHub 服务不可用，请重新登录'
         return redirect(url_for('auth.login_page'))
     
     # 获取仓库信息
@@ -88,7 +88,7 @@ def remove_repository(repo_full_name):
     """删除仓库"""
     # 检查登录状态
     if 'github_token' not in session:
-        flash('请先登录', 'error')
+        session['login_error'] = '请先登录'
         return redirect(url_for('auth.login_page'))
     
     success, message = _remove_repo(repo_full_name)

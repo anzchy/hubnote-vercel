@@ -131,50 +131,85 @@ def api_login():
         }), 500
 
 # Web 登录路由
-@auth_bp.route('/login', methods=['GET'])
+@auth_bp.route('/login', methods=['GET', 'POST'])
 def login_page():
-    """显示登录页面"""
-    return render_template('login.html')
-
-@auth_bp.route('/login', methods=['POST'])
-def login():
-    """处理登录请求"""
+    """登录页面"""
+    if request.method == 'GET':
+        # 检查是否有登出消息或登录成功消息
+        messages = {}
+        
+        # 检查登出消息
+        if 'logout_message' in session:
+            messages['logout'] = session.pop('logout_message')
+        
+        # 检查登录成功消息（从其他页面重定向过来）
+        if 'login_success_message' in session:
+            messages['success'] = session.pop('login_success_message')
+        
+        # 检查登录错误消息（从其他页面重定向过来）
+        if 'login_error' in session:
+            messages['error'] = session.pop('login_error')
+        
+        return render_template('login.html', messages=messages)
+    
     username = request.form.get('username', '').strip()
-    password = request.form.get('password', '').strip()
+    github_token = request.form.get('github_token', '').strip()
     
-    if not username or not password:
-        return render_template('login.html', error='请输入用户名和密码')
+    if not username or not github_token:
+        return render_template('login.html', 
+                             error='请输入用户名和 GitHub Token',
+                             username=username,
+                             messages={})
     
-    # 使用密码作为 GitHub Token 进行验证
-    temp_github_service = GitHubService(password)
-    success, message = temp_github_service.validate_token()
-    
-    if success:
-        # 验证成功，获取用户信息
-        user_result = temp_github_service.get_current_user()
-        if user_result['success'] and user_result['data']['login'] == username:
-            # 检查用户是否在白名单中
-            if not auth_manager.is_user_allowed(username):
-                return render_template('login.html', error='您没有访问权限，请联系管理员')
-            
-            # 用户名匹配且在白名单中，创建会话
-            session['github_token'] = password
-            session['username'] = username
-            session['user_data'] = user_result['data']
-            session['is_admin'] = auth_manager.is_user_admin(username)
-            
-            flash('登录成功！', 'success')
-            return redirect(url_for('index'))
-        else:
-            return render_template('login.html', error='用户名与 GitHub Token 不匹配')
-    else:
-        return render_template('login.html', error=f'GitHub Token 验证失败: {message}')
+    try:
+        # 验证 GitHub Token
+        github_service = GitHubService(github_token)
+        success, user_data = github_service.validate_token()
+        
+        if not success:
+            return render_template('login.html', 
+                                 error='GitHub Token 无效，请检查后重试',
+                                 username=username,
+                                 messages={})
+        
+        # 检查用户是否在白名单中
+        if not auth_manager.is_user_allowed(username):
+            return render_template('login.html', 
+                                 error='当前您不在白名单中，请联系管理员',
+                                 username=username,
+                                 messages={})
+        
+        # 检查是否为管理员
+        is_admin = auth_manager.is_user_admin(username)
+        
+        # 记录用户登录统计
+        storage.record_user_login(username)
+        
+        # 设置会话
+        session['github_token'] = github_token
+        session['username'] = username
+        session['is_admin'] = is_admin
+        session['user_data'] = user_data
+        
+        # 设置成功消息到会话中，这样重定向后也能显示
+        session['login_success_message'] = f'欢迎回来，{username}！'
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"登录失败: {e}")
+        return render_template('login.html', 
+                             error='登录失败，请检查网络连接后重试',
+                             username=username,
+                             messages={})
 
 @auth_bp.route('/logout')
 def logout():
     """用户登出"""
+    # 保存登出消息到会话中
+    logout_message = '已成功登出'
     session.clear()
-    flash('已成功登出', 'success')
+    # 重新设置会话以保存消息
+    session['logout_message'] = logout_message
     return redirect(url_for('auth.login_page'))
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
@@ -350,7 +385,7 @@ def user_management():
     """用户管理页面"""
     # 检查是否登录
     if 'username' not in session:
-        flash('请先登录', 'error')
+        session['login_error'] = '请先登录'
         return redirect(url_for('auth.login_page'))
     
     # 检查是否为管理员
@@ -361,6 +396,21 @@ def user_management():
     # 获取用户白名单
     whitelist = storage.get_user_whitelist()
     
+    # 获取用户统计信息
+    user_stats = storage.get_user_stats()
+    
+    # 获取今日登录次数
+    import datetime
+    today = datetime.datetime.now().strftime('%Y-%m-%d')
+    today_logins = user_stats.get('daily_stats', {}).get(today, {}).get('logins', 0)
+    
+    # 合并数据
+    whitelist['user_stats'] = user_stats.get('user_stats', {})
+    whitelist['stats'] = {
+        'total_logins': user_stats.get('total_logins', 0),
+        'today_logins': today_logins
+    }
+    
     return render_template('user_management.html', whitelist=whitelist)
 
 @auth_bp.route('/add-user', methods=['POST'])
@@ -368,7 +418,7 @@ def add_user_to_whitelist():
     """添加用户到白名单"""
     # 检查是否登录且为管理员
     if 'username' not in session or not session.get('is_admin', False):
-        flash('您没有管理员权限', 'error')
+        session['login_error'] = '您没有管理员权限'
         return redirect(url_for('auth.login_page'))
     
     username = request.form.get('username', '').strip()
@@ -394,7 +444,7 @@ def remove_user_from_whitelist():
     """从白名单中移除用户"""
     # 检查是否登录且为管理员
     if 'username' not in session or not session.get('is_admin', False):
-        flash('您没有管理员权限', 'error')
+        session['login_error'] = '您没有管理员权限'
         return redirect(url_for('auth.login_page'))
     
     username = request.form.get('username', '').strip()

@@ -92,18 +92,27 @@ def create_app():
         github_service = get_github_service()
         if not github_service:
             session.clear()
-            flash('GitHub 服务不可用，请重新登录', 'error')
+            session['login_error'] = 'GitHub 服务不可用，请重新登录'
             return redirect(url_for('auth.login_page'))
         
         # 验证 Token 是否仍然有效
         success, _ = github_service.validate_token()
         if not success:
             session.clear()
-            flash('GitHub Token 已失效，请重新登录', 'error')
+            session['login_error'] = 'GitHub Token 已失效，请重新登录'
             return redirect(url_for('auth.login_page'))
         
-        repos_data = storage.get_repos()
-        user_data = session.get('user_data', {})
+        # 获取用户信息
+        username = session.get('username')
+        is_admin = session.get('is_admin', False)
+        
+        # 根据用户权限获取仓库列表
+        repos_data = storage.get_user_repos(username, is_admin)
+        user_data = {
+            'username': username,
+            'is_admin': is_admin
+        }
+        
         return render_template('index.html', 
                              repos=repos_data.get('repositories', []),
                              user=user_data)
@@ -160,34 +169,16 @@ def create_app():
             return redirect(url_for('index'))
         
         # 使用 StorageManager 添加仓库
-        repos_data = storage.get_repos()
+        success, message = _add_repo(result['data'])
         
-        # 检查是否已存在
-        for repo in repos_data.get('repositories', []):
-            if repo.get('full_name') == result['data']['full_name']:
-                if is_ajax:
-                    return jsonify({'success': False, 'error': '仓库已存在'}), 400
-                flash('仓库已存在', 'error')
-                return redirect(url_for('index'))
-        
-        # 添加时间戳
-        result['data']['added_at'] = datetime.now().isoformat()
-        
-        # 确保 repositories 列表存在
-        if 'repositories' not in repos_data:
-            repos_data['repositories'] = []
-        
-        repos_data['repositories'].append(result['data'])
-        
-        # 保存到存储
-        if storage.save_repos(repos_data):
+        if success:
             if is_ajax:
-                return jsonify({'success': True, 'message': '仓库添加成功', 'repo': result['data']})
-            flash('仓库添加成功', 'success')
+                return jsonify({'success': True, 'message': message, 'repo': result['data']})
+            flash(message, 'success')
         else:
             if is_ajax:
-                return jsonify({'success': False, 'error': '保存仓库信息失败'}), 500
-            flash('保存仓库信息失败', 'error')
+                return jsonify({'success': False, 'error': message}), 400
+            flash(message, 'error')
         
         return redirect(url_for('index'))
     
@@ -239,4 +230,4 @@ app.debug = False
 
 # 开发环境运行
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5055)

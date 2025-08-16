@@ -1,142 +1,972 @@
 {% extends "base.html" %}
 
-{% block title %}用户管理{% endblock %}
+{% block title %}用户管理 - HubNote{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="page-header">
-        <h1>用户管理</h1>
-        <p class="text-muted">管理系统用户访问权限</p>
-    </div>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="user-management-container">
+    <!-- 模块1：添加用户 -->
+    <section class="add-user-section">
+        <div class="section-header">
+            <h2><i class="fas fa-user-plus"></i> 添加用户</h2>
+            <p>将新的GitHub用户添加到系统白名单中</p>
+        </div>
+        
+        <div class="add-user-form-container">
+            <form method="POST" action="{{ url_for('auth.add_user_to_whitelist') }}" id="addUserForm" class="add-user-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fab fa-github"></i> GitHub 用户名
+                        </label>
+                        <input type="text" 
+                               id="username" 
+                               name="username" 
+                               placeholder="例如: username"
+                               required>
+                        <small class="form-help">请输入要添加的 GitHub 用户名</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="is_admin" name="is_admin">
+                            <span class="checkmark"></span>
+                            <i class="fas fa-crown"></i> 管理员权限
+                        </label>
+                        <small class="form-help">管理员可以管理用户白名单</small>
+                    </div>
                 </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+                
+                <button type="submit" class="btn-add-user">
+                    <i class="fas fa-plus"></i> 添加用户
+                </button>
+            </form>
+        </div>
+    </section>
 
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">添加用户</h5>
+    <!-- 模块2：管理系统用户访问权限 -->
+    <section class="user-management-section">
+        <div class="section-header">
+            <h2><i class="fas fa-users-cog"></i> 管理系统用户访问权限</h2>
+            <p>查看和管理白名单用户状态</p>
+        </div>
+        
+        <!-- 统计概览 -->
+        <div class="stats-grid">
+            <div class="stat-card stat-total">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
                 </div>
-                <div class="card-body">
-                    <form method="POST" action="{{ url_for('auth.add_user_to_whitelist') }}">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">GitHub 用户名</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
-                            <div class="form-text">请输入要添加的 GitHub 用户名</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
-                                <label class="form-check-label" for="is_admin">
-                                    管理员权限
-                                </label>
-                                <div class="form-text">管理员可以管理用户白名单</div>
+                <div class="stat-content">
+                    <h3>{{ whitelist.allowed_users|length }}</h3>
+                    <p>总用户数</p>
+                </div>
+            </div>
+            
+            <div class="stat-card stat-admin">
+                <div class="stat-icon">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ whitelist.admin_users|length }}</h3>
+                    <p>管理员</p>
+                </div>
+            </div>
+            
+            <div class="stat-card stat-regular">
+                <div class="stat-icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ whitelist.allowed_users|length - whitelist.admin_users|length }}</h3>
+                    <p>普通用户</p>
+                </div>
+            </div>
+            
+            <div class="stat-card stat-logins">
+                <div class="stat-icon">
+                    <i class="fas fa-sign-in-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ whitelist.stats.get('today_logins', 0) }}</h3>
+                    <p>今日登录</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 用户列表 -->
+        <div class="user-list-container">
+            <div class="list-header">
+                <h3><i class="fas fa-list"></i> 当前用户列表</h3>
+                <button class="btn-refresh" onclick="refreshUserList()">
+                    <i class="fas fa-sync-alt"></i> 刷新
+                </button>
+            </div>
+            
+            {% if whitelist.allowed_users %}
+                <div class="user-table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>用户信息</th>
+                                <th>权限</th>
+                                <th>登录统计</th>
+                                <th>最后登录</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in whitelist.allowed_users %}
+                            <tr class="user-row">
+                                <td class="user-info">
+                                    <div class="user-avatar">
+                                        <img src="https://github.com/{{ user }}.png?size=48" 
+                                             alt="{{ user }}" 
+                                             class="avatar-img">
+                                    </div>
+                                    <div class="user-details">
+                                        <h4>{{ user }}</h4>
+                                        <span class="user-type">
+                                            <i class="fab fa-github"></i> GitHub用户
+                                        </span>
+                                    </div>
+                                </td>
+                                
+                                <td class="user-role">
+                                    {% if user in whitelist.admin_users %}
+                                        <span class="role-badge role-admin">
+                                            <i class="fas fa-crown"></i> 管理员
+                                        </span>
+                                    {% else %}
+                                        <span class="role-badge role-user">
+                                            <i class="fas fa-user"></i> 普通用户
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="login-stats">
+                                    <div class="stats-display">
+                                        <span class="stat-number">
+                                            {{ whitelist.user_stats.get(user, {}).get('login_count', 0) }}
+                                        </span>
+                                        <span class="stat-label">次登录</span>
+                                    </div>
+                                </td>
+                                
+                                <td class="last-login">
+                                    {% set last_login = whitelist.user_stats.get(user, {}).get('last_login') %}
+                                    {% if last_login %}
+                                        <span class="login-time">
+                                            <i class="fas fa-clock"></i> {{ last_login }}
+                                        </span>
+                                    {% else %}
+                                        <span class="no-login">
+                                            <i class="fas fa-times"></i> 从未登录
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="user-actions">
+                                    <div class="action-buttons">
+                                        <button class="btn-action btn-view" 
+                                                onclick="viewUserDetails('{{ user }}')"
+                                                title="查看详情">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <form method="POST" 
+                                              action="{{ url_for('auth.remove_user_from_whitelist') }}" 
+                                              style="display: inline;"
+                                              onsubmit="return confirm('确定要移除用户 {{ user }} 吗？')">
+                                            <input type="hidden" name="username" value="{{ user }}">
+                                            <button type="submit" 
+                                                    class="btn-action btn-remove"
+                                                    title="移除用户">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h4>暂无用户</h4>
+                    <p>白名单为空时，所有用户都可以访问</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- 模块3：使用说明 -->
+    <section class="usage-section">
+        <div class="section-header">
+            <h2><i class="fas fa-info-circle"></i> 使用说明</h2>
+            <p>了解系统权限和安全设置</p>
+        </div>
+        
+        <div class="usage-content">
+            <div class="usage-grid">
+                <div class="usage-card permissions">
+                    <div class="card-header">
+                        <i class="fas fa-shield-alt"></i>
+                        <h3>权限说明</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="permission-item">
+                            <div class="permission-icon">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="permission-text">
+                                <h4>普通用户</h4>
+                                <p>可以登录系统，查看和管理自己的仓库</p>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">添加用户</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">当前用户列表</h5>
-                </div>
-                <div class="card-body">
-                    {% if whitelist.allowed_users %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>用户名</th>
-                                        <th>权限</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for user in whitelist.allowed_users %}
-                                    <tr>
-                                        <td>{{ user }}</td>
-                                        <td>
-                                            {% if user in whitelist.admin_users %}
-                                                <span class="badge bg-danger">管理员</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">普通用户</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <form method="POST" action="{{ url_for('auth.remove_user_from_whitelist') }}" style="display: inline;">
-                                                <input type="hidden" name="username" value="{{ user }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
-                                                        onclick="return confirm('确定要移除用户 {{ user }} 吗？')">
-                                                    移除
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-users fa-3x mb-3"></i>
-                            <p>暂无用户</p>
-                            <small>白名单为空时，所有用户都可以访问</small>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">使用说明</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>权限说明</h6>
-                            <ul class="list-unstyled">
-                                <li><i class="fas fa-check text-success"></i> <strong>普通用户</strong>：可以登录系统，查看和管理自己的仓库</li>
-                                <li><i class="fas fa-crown text-warning"></i> <strong>管理员</strong>：除普通用户权限外，还可以管理用户白名单</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>安全提示</h6>
-                            <ul class="list-unstyled">
-                                <li><i class="fas fa-shield-alt text-primary"></i> 白名单为空时，所有用户都可以访问</li>
-                                <li><i class="fas fa-exclamation-triangle text-warning"></i> 请谨慎管理管理员权限</li>
-                                <li><i class="fas fa-info-circle text-info"></i> 用户名不区分大小写</li>
-                            </ul>
+                        <div class="permission-item">
+                            <div class="permission-icon">
+                                <i class="fas fa-crown"></i>
+                            </div>
+                            <div class="permission-text">
+                                <h4>管理员</h4>
+                                <p>除普通用户权限外，还可以管理用户白名单</p>
+                            </div>
                         </div>
                     </div>
                 </div>
+                
+                <div class="usage-card security">
+                    <div class="card-header">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>安全提示</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="security-item">
+                            <i class="fas fa-info-circle"></i>
+                            <p>白名单为空时，所有用户都可以访问</p>
+                        </div>
+                        <div class="security-item">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>请谨慎管理管理员权限</p>
+                        </div>
+                        <div class="security-item">
+                            <i class="fas fa-check-circle"></i>
+                            <p>用户名不区分大小写</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- 用户详情模态框 -->
+<div class="modal fade" id="userDetailModal" tabindex="-1" aria-labelledby="userDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userDetailModalLabel">用户详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="userDetailContent">
+                <!-- 用户详情内容 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+/* CSS Grid 布局容器 */
+.user-management-container {
+    display: grid;
+    grid-template-rows: auto auto auto;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+}
+
+/* 通用部分样式 */
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.section-header h2 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.section-header p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* 模块1：添加用户 */
+.add-user-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.add-user-form-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.add-user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    align-items: end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.95rem;
+}
+
+.form-group input[type="text"] {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e1e8ed;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-group input[type="text"]:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-help {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+.checkbox-label:hover {
+    background-color: #f8f9fa;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #f39c12;
+}
+
+.btn-add-user {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+}
+
+.btn-add-user:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+/* 模块2：用户管理 */
+.user-management-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* 统计概览网格 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #fff, #f8f9fa);
+    border-radius: 15px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-total .stat-icon { background: linear-gradient(135deg, #3498db, #2980b9); }
+.stat-admin .stat-icon { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.stat-regular .stat-icon { background: linear-gradient(135deg, #27ae60, #229954); }
+.stat-logins .stat-icon { background: linear-gradient(135deg, #f39c12, #e67e22); }
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0 0 0.25rem 0;
+}
+
+.stat-content p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* 用户列表 */
+.user-list-container {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.list-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+}
+
+.btn-refresh {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-refresh:hover {
+    background: #5a6268;
+}
+
+/* 用户表格 */
+.user-table-container {
+    overflow-x: auto;
+}
+
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.user-table th {
+    background: #f8f9fa;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.user-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+}
+
+.user-row:hover {
+    background-color: #f8f9fa;
+}
+
+/* 用户信息列 */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #e9ecef;
+}
+
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-details h4 {
+    margin: 0 0 0.25rem 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.user-type {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* 权限标签 */
+.role-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.role-admin {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.role-user {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+}
+
+/* 登录统计 */
+.stats-display {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #3498db;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* 最后登录 */
+.login-time, .no-login {
+    font-size: 0.85rem;
+}
+
+.login-time {
+    color: #27ae60;
+}
+
+.no-login {
+    color: #e74c3c;
+}
+
+/* 操作按钮 */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-action {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-view {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-view:hover {
+    background: #138496;
+    transform: scale(1.1);
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-remove:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
+/* 空状态 */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: #dee2e6;
+}
+
+/* 模块3：使用说明 */
+.usage-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.usage-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease;
+}
+
+.usage-card:hover {
+    transform: translateY(-5px);
+}
+
+.usage-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.usage-card .card-header i {
+    font-size: 1.5rem;
+    color: #6c757d;
+}
+
+.usage-card .card-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+}
+
+.usage-card .card-content {
+    padding: 1.5rem;
+}
+
+.permission-item, .security-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.permission-item:last-child, .security-item:last-child {
+    margin-bottom: 0;
+}
+
+.permission-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.permission-item:first-child .permission-icon {
+    background: linear-gradient(135deg, #27ae60, #229954);
+}
+
+.permission-item:last-child .permission-icon {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+}
+
+.permission-text h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.permission-text p {
+    margin: 0;
+    color: #6c757d;
+    line-height: 1.5;
+}
+
+.security-item {
+    align-items: center;
+}
+
+.security-item i {
+    color: #6c757d;
+    margin-right: 0.5rem;
+}
+
+.security-item p {
+    margin: 0;
+    color: #6c757d;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .user-management-container {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .usage-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .user-table th,
+    .user-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .user-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .section-header h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* 确保模态框在页面加载时完全隐藏 */
+#userDetailModal {
+    display: none !important;
+}
+
+#userDetailModal.show {
+    display: block !important;
+}
+
+.modal-backdrop {
+    display: none !important;
+}
+
+.modal-backdrop.show {
+    display: block !important;
+}
+
+body.modal-open {
+    overflow: auto !important;
+    padding-right: 0 !important;
+}
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
-// 自动刷新页面状态
+// 确保页面加载完成后才执行JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('用户管理页面加载完成');
+    
+    // 确保模态框处于隐藏状态
+    const modal = document.getElementById('userDetailModal');
+    if (modal) {
+        // 强制隐藏模态框
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        
+        // 移除背景遮罩
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+        
+        // 恢复body滚动
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+});
+
+function refreshUserList() {
+    location.reload();
+}
+
+function viewUserDetails(username) {
+    try {
+        console.log('查看用户详情:', username);
+        
+        // 获取模态框元素
+        const modalElement = document.getElementById('userDetailModal');
+        if (!modalElement) {
+            console.error('找不到模态框元素');
+            return;
+        }
+        
+        // 更新模态框内容
+        const contentElement = document.getElementById('userDetailContent');
+        if (contentElement) {
+            contentElement.innerHTML = `
+                <div class="text-center">
+                    <img src="https://github.com/${username}.png?size=100" 
+                         alt="${username}" 
+                         class="rounded-circle mb-3" 
+                         width="100" height="100">
+                    <h4>${username}</h4>
+                    <p class="text-muted">GitHub 用户</p>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h6 class="text-primary">用户统计</h6>
+                            <p class="mb-1">登录次数: <span class="badge bg-info">${getUserLoginCount(username)}</span></p>
+                            <p class="mb-1">最后登录: <small class="text-muted">${getUserLastLogin(username)}</small></p>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-success">权限信息</h6>
+                            <p class="mb-1">用户类型: <span class="badge ${isUserAdmin(username) ? 'bg-danger' : 'bg-secondary'}">${isUserAdmin(username) ? '管理员' : '普通用户'}</span></p>
+                            <p class="mb-1">状态: <span class="badge bg-success">活跃</span></p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+    } catch (error) {
+        console.error('显示用户详情失败:', error);
+        alert('显示用户详情失败，请刷新页面重试');
+    }
+}
+
+// 辅助函数：获取用户登录次数
+function getUserLoginCount(username) {
+    // 这里可以从页面数据中获取，暂时返回默认值
+    return 0;
+}
+
+// 辅助函数：获取用户最后登录时间
+function getUserLastLogin(username) {
+    // 这里可以从页面数据中获取，暂时返回默认值
+    return '未知';
+}
+
+// 辅助函数：检查用户是否为管理员
+function isUserAdmin(username) {
+    // 这里可以从页面数据中获取，暂时返回false
+    return false;
+}
+
+// 表单验证
+document.addEventListener('DOMContentLoaded', function() {
+    const addUserForm = document.getElementById('addUserForm');
+    if (addUserForm) {
+        addUserForm.addEventListener('submit', function(e) {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                e.preventDefault();
+                alert('请输入用户名');
+                return false;
+            }
+        });
+    }
+});
+
+// 自动刷新页面状态（每30秒）
 setInterval(function() {
     // 可以在这里添加实时更新逻辑
+    console.log('检查页面状态更新...');
 }, 30000);
 </script>
 {% endblock %}

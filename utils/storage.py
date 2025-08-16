@@ -9,10 +9,22 @@ class StorageManager:
     """存储管理器，支持 Vercel KV 和降级存储方案"""
     
     def __init__(self):
-        self.storage_type = os.getenv('STORAGE_TYPE', 'memory')
+        # 在开发环境中默认使用文件存储
+        if os.getenv('FLASK_ENV') == 'development' or os.getenv('FLASK_DEBUG') == 'true':
+            self.storage_type = 'file'
+        else:
+            self.storage_type = os.getenv('STORAGE_TYPE', 'memory')
+            
         self.kv_url = os.getenv('KV_REST_API_URL')
         self.kv_token = os.getenv('KV_REST_API_TOKEN')
         self.blob_token = os.getenv('BLOB_READ_WRITE_TOKEN')
+        
+        # 调试信息
+        print(f"StorageManager 初始化:")
+        print(f"  - 存储类型: {self.storage_type}")
+        print(f"  - KV URL: {self.kv_url}")
+        print(f"  - KV Token: {'已设置' if self.kv_token else '未设置'}")
+        print(f"  - Blob Token: {'已设置' if self.blob_token else '未设置'}")
         
         # 内存存储（Vercel 环境下的临时方案）
         self._memory_storage = {}
@@ -37,6 +49,58 @@ class StorageManager:
                 return self._get_from_file('repos')
         except Exception as e:
             print(f"获取仓库数据失败: {e}")
+            return self._fallback_data
+    
+    def get_user_repos(self, username: str, is_admin: bool = False) -> Dict[str, Any]:
+        """根据用户权限获取仓库列表"""
+        try:
+            print(f"获取用户仓库: username={username}, is_admin={is_admin}")
+            
+            all_repos = self.get_repos()
+            print(f"所有仓库数量: {len(all_repos.get('repositories', []))}")
+            
+            # 如果是管理员，返回所有仓库
+            if is_admin:
+                print("用户是管理员，返回所有仓库")
+                return all_repos
+            
+            # 如果是普通用户，处理仓库权限
+            user_repos = {
+                'repositories': [],
+                'total_count': 0,
+                'last_updated': all_repos.get('last_updated', '')
+            }
+            
+            repositories = all_repos.get('repositories', [])
+            
+            # 检查是否有added_by字段
+            has_added_by_field = any('added_by' in repo for repo in repositories)
+            
+            if has_added_by_field:
+                # 如果有added_by字段，按用户过滤
+                print("使用added_by字段过滤仓库")
+                for repo in repositories:
+                    if repo.get('added_by') == username:
+                        user_repos['repositories'].append(repo)
+            else:
+                # 如果没有added_by字段，向后兼容
+                # 为现有仓库添加默认的added_by字段（基于owner）
+                print("没有added_by字段，基于owner字段进行权限控制")
+                for repo in repositories:
+                    repo_owner = repo.get('owner', '')
+                    if repo_owner.lower() == username.lower():
+                        # 用户只能看到自己拥有的仓库
+                        user_repos['repositories'].append(repo)
+            
+            user_repos['total_count'] = len(user_repos['repositories'])
+            print(f"用户 {username} 可见仓库数量: {user_repos['total_count']}")
+            
+            return user_repos
+            
+        except Exception as e:
+            print(f"获取用户仓库失败: {e}")
+            import traceback
+            traceback.print_exc()
             return self._fallback_data
     
     def save_repos(self, data: Dict[str, Any]) -> bool:
@@ -127,6 +191,78 @@ class StorageManager:
                 return self._save_to_file('user_whitelist', data)
         except Exception as e:
             print(f"保存用户白名单失败: {e}")
+            return False
+    
+    def get_user_stats(self) -> Dict[str, Any]:
+        """获取用户统计信息"""
+        try:
+            if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
+                return self._get_from_kv('user_stats')
+            elif self.storage_type == 'memory':
+                return self._get_from_memory('user_stats')
+            else:
+                return self._get_from_file('user_stats')
+        except Exception as e:
+            print(f"获取用户统计信息失败: {e}")
+            return {}
+    
+    def save_user_stats(self, data: Dict[str, Any]) -> bool:
+        """保存用户统计信息"""
+        try:
+            if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
+                return self._save_to_kv('user_stats', data)
+            elif self.storage_type == 'memory':
+                return self._save_to_memory('user_stats', data)
+            else:
+                return self._save_to_file('user_stats', data)
+        except Exception as e:
+            print(f"保存用户统计信息失败: {e}")
+            return False
+    
+    def record_user_login(self, username: str) -> bool:
+        """记录用户登录"""
+        try:
+            stats = self.get_user_stats()
+            
+            # 获取当前时间
+            import datetime
+            now = datetime.datetime.now()
+            today = now.strftime('%Y-%m-%d')
+            
+            # 初始化用户统计
+            if 'user_stats' not in stats:
+                stats['user_stats'] = {}
+            if 'daily_stats' not in stats:
+                stats['daily_stats'] = {}
+            if 'total_logins' not in stats:
+                stats['total_logins'] = 0
+            
+            # 更新用户统计
+            if username not in stats['user_stats']:
+                stats['user_stats'][username] = {
+                    'login_count': 0,
+                    'last_login': None,
+                    'first_login': None
+                }
+            
+            user_stat = stats['user_stats'][username]
+            user_stat['login_count'] += 1
+            user_stat['last_login'] = now.isoformat()
+            if not user_stat['first_login']:
+                user_stat['first_login'] = now.isoformat()
+            
+            # 更新总体统计
+            stats['total_logins'] += 1
+            
+            # 更新今日统计
+            if today not in stats['daily_stats']:
+                stats['daily_stats'][today] = {'logins': 0}
+            stats['daily_stats'][today]['logins'] += 1
+            
+            return self.save_user_stats(stats)
+            
+        except Exception as e:
+            print(f"记录用户登录失败: {e}")
             return False
     
     def _get_from_kv(self, key: str) -> Any:
