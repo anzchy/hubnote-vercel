@@ -108,6 +108,11 @@ def create_app():
         
         # 根据用户权限获取仓库列表
         repos_data = storage.get_user_repos(username, is_admin)
+        print(f"主页路由 - 用户: {username}, 管理员: {is_admin}")
+        print(f"主页路由 - 获取到的仓库数据: {repos_data}")
+        print(f"主页路由 - 仓库列表: {repos_data.get('repositories', [])}")
+        print(f"主页路由 - 仓库数量: {len(repos_data.get('repositories', []))}")
+        
         user_data = {
             'username': username,
             'is_admin': is_admin

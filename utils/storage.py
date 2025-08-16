@@ -9,11 +9,12 @@ class StorageManager:
     """存储管理器，支持 Vercel KV 和降级存储方案"""
     
     def __init__(self):
+        # 获取存储类型
+        self.storage_type = os.getenv('STORAGE_TYPE', 'memory')
+        
         # 在开发环境中默认使用文件存储
         if os.getenv('FLASK_ENV') == 'development' or os.getenv('FLASK_DEBUG') == 'true':
             self.storage_type = 'file'
-        else:
-            self.storage_type = os.getenv('STORAGE_TYPE', 'memory')
             
         self.kv_url = os.getenv('KV_REST_API_URL')
         self.kv_token = os.getenv('KV_REST_API_TOKEN')
@@ -36,16 +37,27 @@ class StorageManager:
             'cache': {}
         }
     
-    def get_repos(self) -> Dict[str, Any]:
+    def get_repos(self, force_refresh: bool = False) -> Dict[str, Any]:
         """获取仓库列表"""
         try:
+            print(f"get_repos: 存储类型={self.storage_type}, 强制刷新={force_refresh}")
+            
             if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
+                print("使用 Vercel KV 存储")
                 return self._get_from_kv('repos')
             elif self.storage_type == 'vercel_blob' and self.blob_token:
+                print("使用 Vercel Blob 存储")
+                if force_refresh:
+                    print("强制刷新：清除内存缓存并重新从 Blob 读取")
+                    # 清除可能的内存缓存
+                    if hasattr(self, '_memory_storage'):
+                        self._memory_storage.pop('repos', None)
                 return self._get_from_blob('repos')
             elif self.storage_type == 'memory':
+                print("使用内存存储")
                 return self._get_from_memory('repos')
             else:
+                print("使用文件存储")
                 return self._get_from_file('repos')
         except Exception as e:
             print(f"获取仓库数据失败: {e}")
@@ -56,7 +68,9 @@ class StorageManager:
         try:
             print(f"获取用户仓库: username={username}, is_admin={is_admin}")
             
-            all_repos = self.get_repos()
+            # 非管理员用户强制刷新，解决 Blob 最终一致性问题
+            force_refresh = not is_admin
+            all_repos = self.get_repos(force_refresh=force_refresh)
             print(f"所有仓库数量: {len(all_repos.get('repositories', []))}")
             
             # 如果是管理员，返回所有仓库
@@ -72,28 +86,33 @@ class StorageManager:
             }
             
             repositories = all_repos.get('repositories', [])
+            print(f"所有仓库列表: {[repo.get('full_name') for repo in repositories]}")
             
-            # 检查是否有added_by字段
-            has_added_by_field = any('added_by' in repo for repo in repositories)
-            
-            if has_added_by_field:
-                # 如果有added_by字段，按用户过滤
-                print("使用added_by字段过滤仓库")
-                for repo in repositories:
-                    if repo.get('added_by') == username:
-                        user_repos['repositories'].append(repo)
-            else:
-                # 如果没有added_by字段，向后兼容
-                # 为现有仓库添加默认的added_by字段（基于owner）
-                print("没有added_by字段，基于owner字段进行权限控制")
-                for repo in repositories:
-                    repo_owner = repo.get('owner', '')
-                    if repo_owner.lower() == username.lower():
-                        # 用户只能看到自己拥有的仓库
-                        user_repos['repositories'].append(repo)
+            # 混合权限控制：优先使用added_by字段，回退到owner字段
+            print("使用混合权限控制策略")
+            for repo in repositories:
+                repo_added_by = repo.get('added_by', '')
+                repo_owner = repo.get('owner', '')
+                
+                print(f"仓库 {repo.get('full_name')}: added_by='{repo_added_by}', owner='{repo_owner}', 当前用户='{username}'")
+                
+                # 策略1：如果仓库有added_by字段，按added_by过滤
+                if repo_added_by and repo_added_by == username:
+                    user_repos['repositories'].append(repo)
+                    print(f"✅ 用户 {username} 可见仓库（added_by匹配）: {repo.get('full_name')}")
+                    continue
+                
+                # 策略2：如果仓库没有added_by字段，按owner过滤（向后兼容）
+                if not repo_added_by and repo_owner.lower() == username.lower():
+                    user_repos['repositories'].append(repo)
+                    print(f"✅ 用户 {username} 可见仓库（owner匹配）: {repo.get('full_name')}")
+                    continue
+                
+                print(f"❌ 用户 {username} 无权访问仓库: {repo.get('full_name')}")
             
             user_repos['total_count'] = len(user_repos['repositories'])
             print(f"用户 {username} 可见仓库数量: {user_repos['total_count']}")
+            print(f"可见仓库列表: {[repo.get('full_name') for repo in user_repos['repositories']]}")
             
             return user_repos
             
@@ -390,33 +409,57 @@ class StorageManager:
             print("Vercel Blob token 未配置，使用降级存储")
             return self._get_from_memory(key)
         
-        try:
-            # 使用 Vercel Blob REST API 获取文件列表
-            headers = {
-                'Authorization': f'Bearer {self.blob_token}'
-            }
-            
-            list_url = 'https://blob.vercel-storage.com/'
-            response = requests.get(list_url, headers=headers)
-            
-            if response.status_code == 200:
-                blobs_data = response.json()
-                target_filename = f"{key}.json"
+        max_retries = 10  # 增加重试次数
+        retry_delay = 2.0  # 从2秒开始
+        
+        for attempt in range(max_retries):
+            try:
+                # 使用 Vercel Blob REST API 获取文件列表
+                headers = {
+                    'Authorization': f'Bearer {self.blob_token}'
+                }
                 
-                # 查找对应的文件
-                for blob in blobs_data.get('blobs', []):
-                    if blob.get('pathname') == target_filename:
-                        # 下载并解析 JSON 数据
-                        file_response = requests.get(blob['url'])
-                        if file_response.status_code == 200:
-                            return file_response.json()
-            
-            # 如果没找到文件，返回默认数据
-            return self._fallback_data if key == 'repos' else {}
-            
-        except Exception as e:
-            print(f"从 Blob 读取数据失败: {e}")
-            return self._fallback_data if key == 'repos' else {}
+                list_url = 'https://blob.vercel-storage.com/'
+                response = requests.get(list_url, headers=headers)
+                
+                if response.status_code == 200:
+                    blobs_data = response.json()
+                    target_filename = f"{key}.json"
+                    
+                    # 查找对应的文件
+                    for blob in blobs_data.get('blobs', []):
+                        if blob.get('pathname') == target_filename:
+                            # 下载并解析 JSON 数据
+                            file_response = requests.get(blob['url'])
+                            if file_response.status_code == 200:
+                                data = file_response.json()
+                                repo_count = len(data.get('repositories', []))
+                                print(f"Blob 读取成功 (尝试 {attempt + 1}/{max_retries}): {repo_count} 个仓库")
+                                
+                                # 如果是第一次读取，记录仓库列表用于调试
+                                if attempt == 0:
+                                    repo_names = [repo.get('full_name') for repo in data.get('repositories', [])]
+                                    print(f"当前仓库列表: {repo_names}")
+                                
+                                return data
+                
+                # 如果没找到文件，返回默认数据
+                if attempt == max_retries - 1:
+                    print(f"Blob 读取失败，已达到最大重试次数")
+                    return self._fallback_data if key == 'repos' else {}
+                
+                print(f"Blob 读取失败，等待 {retry_delay}s 后重试 (尝试 {attempt + 1}/{max_retries})")
+                import time
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, 30.0)  # 更温和的指数退避，最大30秒
+                
+            except Exception as e:
+                print(f"从 Blob 读取数据失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    return self._fallback_data if key == 'repos' else {}
+                import time
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, 30.0)
     
     def _save_to_blob(self, key: str, data: Any) -> bool:
         """保存数据到 Vercel Blob"""

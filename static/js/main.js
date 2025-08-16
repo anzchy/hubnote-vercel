@@ -308,6 +308,9 @@ function showNotification(message, type = 'info') {
             }
         }, 300);
     }, 3000);
+    
+    // 返回通知元素，供外部使用
+    return notification;
 }
 
 // 导出全局函数

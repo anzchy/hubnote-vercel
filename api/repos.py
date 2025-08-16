@@ -173,6 +173,11 @@ def api_get_repo_info(repo_full_name):
 
 def _add_repo(repo_info):
     """添加仓库到存储"""
+    from flask import session
+    
+    # 获取当前用户信息
+    current_user = session.get('username', 'unknown')
+    
     repos_data = storage.get_repos()
     
     # 检查是否已存在
@@ -180,9 +185,12 @@ def _add_repo(repo_info):
         if repo.get('full_name') == repo_info['full_name']:
             return False, '仓库已存在'
     
-    # 添加时间戳
+    # 添加时间戳和用户标识
     from datetime import datetime
     repo_info['added_at'] = datetime.now().isoformat()
+    repo_info['added_by'] = current_user
+    
+    print(f"添加仓库: {repo_info['full_name']}, 用户: {current_user}, added_by: {repo_info['added_by']}")
     
     # 确保 repositories 列表存在
     if 'repositories' not in repos_data:
@@ -192,6 +200,8 @@ def _add_repo(repo_info):
     
     # 保存到存储
     if storage.save_repos(repos_data):
+        print(f"仓库 {repo_info['full_name']} 添加成功，当前总数: {len(repos_data['repositories'])}")
+        print(f"新仓库信息: {repo_info}")
         return True, '仓库添加成功'
     else:
         return False, '保存仓库信息失败'

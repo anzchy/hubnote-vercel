@@ -67,14 +67,35 @@ function addRepository(repoUrl) {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('添加仓库响应:', data);
         if (data.success) {
             window.HubNote.showNotification(data.message || '仓库添加成功！', 'success');
             // 清空表单
             document.getElementById('add-repo-form').reset();
-            // 动态添加新仓库到页面
-            addRepoToPage(data.repo);
-            // 更新仓库计数
-            updateRepoCount();
+            
+            console.log('开始倒计时刷新...');
+            // 显示倒计时提示
+            let countdown = 3;
+            const countdownMsg = window.HubNote.showNotification(
+                `页面将在 ${countdown} 秒后刷新以显示新仓库...`, 
+                'info'
+            );
+            
+            console.log('倒计时通知元素:', countdownMsg);
+            
+            // 倒计时并刷新页面
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                console.log(`倒计时: ${countdown} 秒`);
+                if (countdown > 0 && countdownMsg) {
+                    countdownMsg.textContent = `页面将在 ${countdown} 秒后刷新以显示新仓库...`;
+                } else {
+                    clearInterval(countdownInterval);
+                    console.log('倒计时结束，刷新页面');
+                    // 强制刷新页面
+                    window.location.reload();
+                }
+            }, 1000);
         } else {
             throw new Error(data.error || '添加仓库失败');
         }
