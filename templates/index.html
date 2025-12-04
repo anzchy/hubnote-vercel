@@ -43,16 +43,6 @@
             {% endif %}
         </div>
         
-        <!-- 调试信息 -->
-        <div class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; font-family: monospace; font-size: 12px;">
-            <strong>🔍 调试信息:</strong><br>
-            <strong>repos 变量类型:</strong> {{ repos.__class__.__name__ }}<br>
-            <strong>repos 长度:</strong> {{ repos|length }}<br>
-            <strong>repos 内容:</strong> {{ repos }}<br>
-            <strong>user 信息:</strong> {{ user }}<br>
-            <strong>当前时间:</strong> {{ moment().format('YYYY-MM-DD HH:mm:ss') if moment else 'moment not available' }}
-        </div>
-        
         {% if repos %}
             <div class="repos-grid">
                 {% for repo in repos %}
