@@ -109,6 +109,53 @@ def create_app():
         # 根据用户权限获取仓库列表
         repos_data = storage.get_user_repos(username, is_admin)
         
+        # 🎯 如果用户仓库为空，自动添加默认演示仓库
+        if not repos_data.get('repositories'):
+            print(f"📝 用户 {username} 没有仓库，尝试添加默认仓库...")
+            default_repo_url = 'https://github.com/anzchy/jack-notes'
+            
+            try:
+                # 获取默认仓库信息
+                result = github_service.get_repo_info(default_repo_url)
+                
+                if result['success']:
+                    from datetime import datetime
+                    
+                    # 添加元数据
+                    result['data']['added_at'] = datetime.now().isoformat()
+                    result['data']['added_by'] = username
+                    result['data']['is_default'] = True  # 标记为默认仓库
+                    
+                    # 获取所有仓库数据
+                    all_repos = storage.get_repos()
+                    if 'repositories' not in all_repos:
+                        all_repos['repositories'] = []
+                    
+                    # 检查是否已存在
+                    exists = any(r.get('full_name') == result['data']['full_name'] 
+                               for r in all_repos['repositories'])
+                    
+                    if not exists:
+                        all_repos['repositories'].append(result['data'])
+                        
+                        if storage.save_repos(all_repos):
+                            print(f"✅ 默认仓库 {default_repo_url} 添加成功")
+                            # 重新获取用户仓库（包含新添加的默认仓库）
+                            repos_data = storage.get_user_repos(username, is_admin)
+                        else:
+                            print(f"❌ 保存默认仓库失败")
+                    else:
+                        print(f"ℹ️ 默认仓库已存在")
+                        # 重新获取（可能其他用户添加过）
+                        repos_data = storage.get_user_repos(username, is_admin)
+                else:
+                    print(f"⚠️ 获取默认仓库信息失败: {result.get('error')}")
+                    
+            except Exception as e:
+                print(f"❌ 添加默认仓库时出错: {e}")
+                import traceback
+                traceback.print_exc()
+        
         user_data = {
             'username': username,
             'is_admin': is_admin

@@ -142,6 +142,42 @@ def create_app(config_name=None):
         storage = StorageManager()
         repos_data = storage.get_repos()
         
+        # 🎯 如果仓库列表为空，自动添加默认演示仓库
+        if not repos_data.get('repositories'):
+            username = session.get('username')
+            print(f"📝 用户 {username} 没有仓库，尝试添加默认仓库...")
+            default_repo_url = 'https://github.com/anzchy/jack-notes'
+            
+            try:
+                # 获取默认仓库信息
+                result = github_service.get_repo_info(default_repo_url)
+                
+                if result['success']:
+                    from datetime import datetime
+                    
+                    # 添加元数据
+                    result['data']['added_at'] = datetime.now().isoformat()
+                    result['data']['added_by'] = username
+                    result['data']['is_default'] = True  # 标记为默认仓库
+                    
+                    # 添加到仓库列表
+                    if 'repositories' not in repos_data:
+                        repos_data['repositories'] = []
+                    
+                    repos_data['repositories'].append(result['data'])
+                    
+                    if storage.save_repos(repos_data):
+                        print(f"✅ 默认仓库 {default_repo_url} 添加成功")
+                    else:
+                        print(f"❌ 保存默认仓库失败")
+                else:
+                    print(f"⚠️ 获取默认仓库信息失败: {result.get('error')}")
+                    
+            except Exception as e:
+                print(f"❌ 添加默认仓库时出错: {e}")
+                import traceback
+                traceback.print_exc()
+        
         # 获取用户数据
         user_data = {
             'username': session.get('username'),
