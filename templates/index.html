@@ -34,72 +34,30 @@
     <!-- 仓库列表 -->
     <div class="repos-section">
         <div class="section-header">
-            <h2>已添加的仓库 ({{ repos|length }})</h2>
-            {% if repos %}
-            <button class="btn btn-primary" id="exportDataBtn">
+            <h2>已添加的仓库 <span id="repo-count-badge">(0)</span></h2>
+            <button class="btn btn-primary" id="exportDataBtn" style="display: none;">
                 <span class="btn-icon">📊</span>
                 导出数据
             </button>
-            {% endif %}
         </div>
         
-        {% if repos %}
-            <div class="repos-grid">
-                {% for repo in repos %}
-                <div class="repo-card">
-                    <div class="repo-header">
-                        <h3 class="repo-name">
-                            <a href="{{ repo.url }}" target="_blank">{{ repo.full_name }}</a>
-                        </h3>
-                        <div class="repo-actions">
-                            <a href="{{ url_for('issues.repo_issues', repo_full_name=repo.full_name) }}" 
-                               class="btn btn-sm btn-outline">查看 Issues</a>
-                            <a href="{{ url_for('remove_repository', repo_full_name=repo.full_name) }}" 
-                               class="btn btn-sm btn-danger"
-                               onclick="return confirm('确定要删除这个仓库吗？')">删除</a>
-                        </div>
-                    </div>
-                    
-                    {% if repo.description %}
-                    <p class="repo-description">{{ repo.description }}</p>
-                    {% endif %}
-                    
-                    <div class="repo-stats">
-                        <span class="stat-item">
-                            <span class="stat-icon">⭐</span>
-                            {{ repo.stars }}
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-icon">🍴</span>
-                            {{ repo.forks }}
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-icon">🐛</span>
-                            {{ repo.open_issues }} Issues
-                        </span>
-                        {% if repo.language %}
-                        <span class="stat-item">
-                            <span class="stat-icon">💻</span>
-                            {{ repo.language }}
-                        </span>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="repo-meta">
-                        <small class="text-muted">
-                            添加于 {{ repo.added_at | datetime }}
-                        </small>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">📚</div>
-                <h3>还没有添加任何仓库</h3>
-                <p>添加你的第一个 GitHub 仓库开始使用 HubNote</p>
-            </div>
-        {% endif %}
+        <!-- 加载中状态 -->
+        <div id="loading-state" class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>正在加载仓库列表...</p>
+        </div>
+        
+        <!-- 仓库网格容器 -->
+        <div id="repos-grid" class="repos-grid" style="display: none;">
+            <!-- JavaScript 将在这里插入仓库卡片 -->
+        </div>
+        
+        <!-- 空状态 -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">📚</div>
+            <h3>还没有添加任何仓库</h3>
+            <p>添加你的第一个 GitHub 仓库开始使用 HubNote</p>
+        </div>
     </div>
 
     <!-- 数据导出模态框 -->

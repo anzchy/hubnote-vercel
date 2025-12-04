@@ -63,6 +63,36 @@ def create_app():
             return None
         return GitHubService(github_token)
     
+    def _add_repo(repo_data):
+        """添加仓库到存储（内部函数）"""
+        from datetime import datetime
+        from flask import session
+        
+        # 使用 StorageManager
+        storage = StorageManager()
+        repos_data = storage.get_repos()
+        
+        # 检查是否已存在
+        for repo in repos_data.get('repositories', []):
+            if repo.get('full_name') == repo_data['full_name']:
+                return False, '仓库已存在'
+        
+        # 添加元数据
+        repo_data['added_at'] = datetime.now().isoformat()
+        repo_data['added_by'] = session.get('username', '')
+        
+        # 确保列表存在
+        if 'repositories' not in repos_data:
+            repos_data['repositories'] = []
+            
+        repos_data['repositories'].append(repo_data)
+        
+        # 保存
+        if storage.save_repos(repos_data):
+            return True, '仓库添加成功'
+        else:
+            return False, '保存仓库信息失败'
+
     # 模板过滤器
     @app.template_filter('datetime')
     def datetime_filter(s):
@@ -161,9 +191,39 @@ def create_app():
             'is_admin': is_admin
         }
         
+        # 修改：不再由后端渲染 repos，而是让前端通过 API 获取
+        # 这样可以分离关注点，并更容易排查数据问题
         return render_template('index.html', 
-                             repos=repos_data.get('repositories', []),
+                             repos=[],  # 传空列表，让前端 JS 去加载
                              user=user_data)
+
+    @app.route('/api/my_repos')
+    def api_my_repos():
+        """获取当前用户的仓库列表（前端渲染专用）"""
+        from flask import session
+        from utils.storage import StorageManager
+        
+        # 1. 获取用户信息
+        username = session.get('username')
+        is_admin = session.get('is_admin', False)
+        
+        if not username:
+            return jsonify({'success': False, 'error': '未登录'}), 401
+            
+        # 2. 获取数据
+        storage = StorageManager()
+        repos_data = storage.get_user_repos(username, is_admin)
+        
+        repos = repos_data.get('repositories', [])
+        
+        # 3. 返回 JSON
+        return jsonify({
+            'success': True,
+            'count': len(repos),
+            'username': username,
+            'is_admin': is_admin,
+            'repositories': repos
+        })
     
     # 设置引导页面
     @app.route('/setup')
