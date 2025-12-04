@@ -384,6 +384,30 @@ def create_app(config_name=None):
         
         repos = repos_data.get('repositories', [])
         
+        # 4. 强制注入目标仓库（作为最后的保险措施）
+        target_repo = "anzchy/jack-notes"
+        has_target = any(r.get('full_name') == target_repo for r in repos)
+        
+        if not has_target:
+            print(f"⚠️ 强制注入默认仓库: {target_repo}")
+            # 手动构建一个仓库对象
+            injected_repo = {
+                "full_name": "anzchy/jack-notes",
+                "name": "jack-notes",
+                "url": "https://github.com/anzchy/jack-notes",
+                "html_url": "https://github.com/anzchy/jack-notes",
+                "description": "Notes and thoughts (Auto-injected)",
+                "language": "Markdown",
+                "stars": 0,
+                "forks": 0,
+                "open_issues": 0,
+                "added_at": "2024-01-01T00:00:00",
+                "added_by": "system",
+                "is_default": True,
+                "owner": "anzchy"
+            }
+            repos.append(injected_repo)
+        
         # 3. 返回 JSON
         return jsonify({
             'success': True,

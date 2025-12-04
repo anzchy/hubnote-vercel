@@ -40,10 +40,35 @@ function loadRepositories() {
         .then(data => {
             if (loadingState) loadingState.style.display = 'none';
             
-            if (data.success && data.repositories && data.repositories.length > 0) {
-                renderRepoList(data.repositories);
-                if (reposGrid) reposGrid.style.display = 'grid';
-                if (exportBtn) exportBtn.style.display = 'inline-flex';
+            if (data.success && data.repositories) {
+                let repos = data.repositories;
+                
+                // 强制注入检查（前端双重保险）
+                const targetRepo = "anzchy/jack-notes";
+                const hasTarget = repos.some(r => r.full_name === targetRepo);
+                
+                if (!hasTarget) {
+                    console.warn('强制前端注入仓库:', targetRepo);
+                    repos.push({
+                        full_name: targetRepo,
+                        name: "jack-notes",
+                        url: "https://github.com/anzchy/jack-notes",
+                        description: "Notes and thoughts (Auto-injected)",
+                        language: "Markdown",
+                        stars: 0, forks: 0, open_issues: 0,
+                        added_at: new Date().toISOString(),
+                        is_default: true
+                    });
+                }
+
+                if (repos.length > 0) {
+                    renderRepoList(repos);
+                    if (reposGrid) reposGrid.style.display = 'grid';
+                    if (exportBtn) exportBtn.style.display = 'inline-flex';
+                } else {
+                    if (emptyState) emptyState.style.display = 'flex';
+                    if (exportBtn) exportBtn.style.display = 'none';
+                }
             } else {
                 if (emptyState) emptyState.style.display = 'flex';
                 if (exportBtn) exportBtn.style.display = 'none';
