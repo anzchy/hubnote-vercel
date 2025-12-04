@@ -364,11 +364,39 @@ def create_app(config_name=None):
                              comments=comments)
     
     # API 路由
+    @app.route('/api/my_repos')
+    def api_my_repos():
+        """获取当前用户的仓库列表（前端渲染专用）"""
+        from flask import session
+        from utils.storage import StorageManager
+        
+        # 1. 获取用户信息
+        username = session.get('username')
+        is_admin = session.get('is_admin', False)
+        
+        if not username:
+            return jsonify({'success': False, 'error': '未登录'}), 401
+            
+        # 2. 获取数据
+        storage = StorageManager()
+        # 使用我们刚刚修复过的、忽略大小写的权限逻辑
+        repos_data = storage.get_user_repos(username, is_admin)
+        
+        repos = repos_data.get('repositories', [])
+        
+        # 3. 返回 JSON
+        return jsonify({
+            'success': True,
+            'count': len(repos),
+            'username': username,
+            'is_admin': is_admin,
+            'repositories': repos
+        })
+
     @app.route('/api/repos')
     def api_repos():
-        """获取仓库列表 API"""
-        repos_data = load_repos()
-        return jsonify(repos_data)
+        """获取仓库列表 API (旧接口，保留兼容性)"""
+        return api_my_repos()
     
     @app.route('/api/repo/<path:repo_full_name>/issues')
     def api_repo_issues(repo_full_name):
