@@ -160,10 +160,12 @@ def create_app(config_name=None):
         """添加仓库"""
         from utils.storage import StorageManager
         from datetime import datetime
+        from flask import session
         
         repo_url = request.form.get('repo_url', '').strip()
         
         # 调试信息
+        print(f"🔍 正在添加仓库: {repo_url}")
         print(f"Request headers: {dict(request.headers)}")
         print(f"X-Requested-With: {request.headers.get('X-Requested-With')}")
         print(f"Accept: {request.headers.get('Accept')}")
@@ -174,6 +176,7 @@ def create_app(config_name=None):
         print(f"is_ajax: {is_ajax}")
         
         if not repo_url:
+            print(f"❌ 错误: 仓库 URL 为空")
             if is_ajax:
                 return jsonify({'success': False, 'error': '请输入仓库 URL'}), 400
             flash('请输入仓库 URL', 'error')
@@ -182,18 +185,23 @@ def create_app(config_name=None):
         # 获取 GitHub 服务实例
         github_service = get_github_service()
         if not github_service:
+            print(f"❌ 错误: GitHub 服务不可用")
             if is_ajax:
                 return jsonify({'success': False, 'error': '请先登录'}), 401
             session['login_error'] = '请先登录'
             return redirect(url_for('auth.login_page'))
         
         # 获取仓库信息
+        print(f"🔍 正在获取仓库信息: {repo_url}")
         result = github_service.get_repo_info(repo_url)
         if not result['success']:
+            print(f"❌ 错误: 获取仓库信息失败 - {result['error']}")
             if is_ajax:
                 return jsonify({'success': False, 'error': f'获取仓库信息失败: {result["error"]}'}), 400
             flash(f'获取仓库信息失败: {result["error"]}', 'error')
             return redirect(url_for('index'))
+        
+        print(f"✅ 获取到仓库信息: {result['data'].get('full_name')}")
         
         # 使用 StorageManager 添加仓库
         storage = StorageManager()
@@ -202,13 +210,17 @@ def create_app(config_name=None):
         # 检查是否已存在
         for repo in repos_data.get('repositories', []):
             if repo.get('full_name') == result['data']['full_name']:
+                print(f"⚠️ 仓库已存在: {result['data']['full_name']}")
                 if is_ajax:
                     return jsonify({'success': False, 'error': '仓库已存在'}), 400
                 flash('仓库已存在', 'error')
                 return redirect(url_for('index'))
         
-        # 添加时间戳
+        # 添加时间戳和用户信息
         result['data']['added_at'] = datetime.now().isoformat()
+        result['data']['added_by'] = session.get('username', '')
+        
+        print(f"📝 仓库将被添加: {result['data']['full_name']}, 添加人: {result['data']['added_by']}")
         
         # 确保 repositories 列表存在
         if 'repositories' not in repos_data:
@@ -217,16 +229,25 @@ def create_app(config_name=None):
         repos_data['repositories'].append(result['data'])
         
         # 保存到存储
-        if storage.save_repos(repos_data):
-            if is_ajax:
-                return jsonify({'success': True, 'message': '仓库添加成功', 'repo': result['data']})
-            flash('仓库添加成功', 'success')
-        else:
-            if is_ajax:
-                return jsonify({'success': False, 'error': '保存仓库信息失败'}), 500
-            flash('保存仓库信息失败', 'error')
+        print(f"💾 正在保存仓库数据...")
+        save_success = storage.save_repos(repos_data)
         
-        return redirect(url_for('index'))
+        if save_success:
+            print(f"✅ 仓库保存成功: {result['data']['full_name']}")
+            if is_ajax:
+                print(f"📤 返回 JSON 响应: success=True")
+                return jsonify({'success': True, 'message': '仓库添加成功', 'repo': result['data']})
+            else:
+                flash('仓库添加成功', 'success')
+                return redirect(url_for('index'))
+        else:
+            print(f"❌ 错误: 保存仓库信息失败")
+            if is_ajax:
+                print(f"📤 返回 JSON 响应: success=False")
+                return jsonify({'success': False, 'error': '保存仓库信息失败'}), 500
+            else:
+                flash('保存仓库信息失败', 'error')
+                return redirect(url_for('index'))
     
     @app.route('/remove_repo/<path:repo_full_name>')
     def remove_repository(repo_full_name):
