@@ -113,25 +113,50 @@ class StorageManager:
             
             # 混合权限控制：优先使用added_by字段，回退到owner字段
             print("使用混合权限控制策略")
+            
+            # 获取当前用户的白名单状态
+            whitelist = self.get_user_whitelist()
+            is_global_admin = username in whitelist.get('admin_users', [])
+            
+            # 检查是否是默认管理员（环境变量）
+            default_admin = os.getenv('DEFAULT_ADMIN_USER', '')
+            if default_admin and default_admin.lower() == username.lower():
+                print(f"👑 用户 {username} 是默认管理员，拥有所有权限")
+                is_global_admin = True
+            
+            # 如果是全局管理员，直接返回所有仓库
+            if is_global_admin:
+                print(f"👑 管理员 {username} 查看所有仓库")
+                return all_repos
+
             for repo in repositories:
                 repo_added_by = repo.get('added_by', '')
                 repo_owner = repo.get('owner', '')
                 
-                print(f"仓库 {repo.get('full_name')}: added_by='{repo_added_by}', owner='{repo_owner}', 当前用户='{username}'")
+                # 调试信息
+                # print(f"仓库 {repo.get('full_name')}: added_by='{repo_added_by}', owner='{repo_owner}', 当前用户='{username}'")
                 
-                # 策略1：如果仓库有added_by字段，按added_by过滤
-                if repo_added_by and repo_added_by == username:
+                # 统一转换为小写进行比较
+                username_lower = username.lower()
+                added_by_lower = repo_added_by.lower() if repo_added_by else ''
+                owner_lower = repo_owner.lower() if repo_owner else ''
+                
+                # 策略1：如果仓库有added_by字段，按added_by过滤 (忽略大小写)
+                if added_by_lower and added_by_lower == username_lower:
                     user_repos['repositories'].append(repo)
-                    print(f"✅ 用户 {username} 可见仓库（added_by匹配）: {repo.get('full_name')}")
                     continue
                 
-                # 策略2：如果仓库没有added_by字段，按owner过滤（向后兼容）
-                if not repo_added_by and repo_owner.lower() == username.lower():
+                # 策略2：如果仓库没有added_by字段，按owner过滤 (忽略大小写)
+                if not added_by_lower and owner_lower == username_lower:
                     user_repos['repositories'].append(repo)
-                    print(f"✅ 用户 {username} 可见仓库（owner匹配）: {repo.get('full_name')}")
                     continue
                 
-                print(f"❌ 用户 {username} 无权访问仓库: {repo.get('full_name')}")
+                # 策略3：如果是默认演示仓库，所有人可见
+                if repo.get('is_default') is True:
+                    user_repos['repositories'].append(repo)
+                    continue
+                
+                # print(f"❌ 用户 {username} 无权访问仓库: {repo.get('full_name')}")
             
             user_repos['total_count'] = len(user_repos['repositories'])
             print(f"用户 {username} 可见仓库数量: {user_repos['total_count']}")
