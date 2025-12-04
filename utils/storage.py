@@ -225,14 +225,40 @@ class StorageManager:
     def get_user_whitelist(self) -> Dict[str, Any]:
         """获取用户白名单"""
         try:
+            whitelist = None
+            
             if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
-                return self._get_from_kv('user_whitelist')
+                whitelist = self._get_from_kv('user_whitelist')
             elif self.storage_type == 'memory':
-                return self._get_from_memory('user_whitelist')
+                whitelist = self._get_from_memory('user_whitelist')
             else:
-                return self._get_from_file('user_whitelist')
+                whitelist = self._get_from_file('user_whitelist')
+            
+            # 如果 KV 中没有数据且本地有文件，自动同步到 KV
+            if whitelist is None and self.is_vercel:
+                print("⚠️ Vercel KV 中未找到用户白名单，尝试从环境变量初始化...")
+                # 从环境变量读取默认管理员
+                default_admin = os.getenv('DEFAULT_ADMIN_USER', '')
+                if default_admin:
+                    default_whitelist = {
+                        'allowed_users': [default_admin],
+                        'admin_users': [default_admin]
+                    }
+                    print(f"✅ 初始化默认管理员: {default_admin}")
+                    if self.save_user_whitelist(default_whitelist):
+                        print("✅ 用户白名单已自动初始化到 KV")
+                        return default_whitelist
+                
+                # 如果没有配置环境变量，返回空白名单
+                print("⚠️ 未配置 DEFAULT_ADMIN_USER 环境变量，返回空白名单")
+                return {'allowed_users': [], 'admin_users': []}
+            
+            return whitelist if whitelist is not None else {'allowed_users': [], 'admin_users': []}
+            
         except Exception as e:
             print(f"获取用户白名单失败: {e}")
+            import traceback
+            traceback.print_exc()
             return {'allowed_users': [], 'admin_users': []}
     
     def save_user_whitelist(self, data: Dict[str, Any]) -> bool:
