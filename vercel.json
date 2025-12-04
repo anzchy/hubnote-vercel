@@ -25,7 +25,7 @@
     }
   ],
   "env": {
-    "STORAGE_TYPE": "vercel_blob",
+    "STORAGE_TYPE": "vercel_kv",
     "FLASK_ENV": "production"
   }
 }

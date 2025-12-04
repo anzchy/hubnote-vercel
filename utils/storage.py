@@ -20,10 +20,26 @@ class StorageManager:
         self.kv_token = os.getenv('KV_REST_API_TOKEN')
         self.blob_token = os.getenv('BLOB_READ_WRITE_TOKEN')
         
+        # 检测 Vercel 环境
+        self.is_vercel = os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV') is not None
+        
+        # Vercel 环境自动选择合适的存储
+        if self.is_vercel:
+            if self.kv_url and self.kv_token:
+                self.storage_type = 'vercel_kv'
+                print("🔧 检测到 Vercel 环境，自动切换到 Vercel KV 存储")
+            elif self.blob_token:
+                self.storage_type = 'vercel_blob'
+                print("🔧 检测到 Vercel 环境，自动切换到 Vercel Blob 存储")
+            else:
+                self.storage_type = 'memory'
+                print("⚠️ 检测到 Vercel 环境，但未配置 KV 或 Blob，使用内存存储（数据不持久化）")
+        
         # 调试信息
         print(f"StorageManager 初始化:")
+        print(f"  - 运行环境: {'Vercel' if self.is_vercel else '本地/其他'}")
         print(f"  - 存储类型: {self.storage_type}")
-        print(f"  - KV URL: {self.kv_url}")
+        print(f"  - KV URL: {self.kv_url or '未设置'}")
         print(f"  - KV Token: {'已设置' if self.kv_token else '未设置'}")
         print(f"  - Blob Token: {'已设置' if self.blob_token else '未设置'}")
         
@@ -40,27 +56,34 @@ class StorageManager:
     def get_repos(self, force_refresh: bool = False) -> Dict[str, Any]:
         """获取仓库列表"""
         try:
-            print(f"get_repos: 存储类型={self.storage_type}, 强制刷新={force_refresh}")
+            print(f"📥 获取仓库数据: 存储类型={self.storage_type}, 强制刷新={force_refresh}")
             
             if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
-                print("使用 Vercel KV 存储")
-                return self._get_from_kv('repos')
+                print("📥 使用 Vercel KV 存储读取数据")
+                result = self._get_from_kv('repos')
+                return result if result is not None else self._fallback_data
             elif self.storage_type == 'vercel_blob' and self.blob_token:
-                print("使用 Vercel Blob 存储")
+                print("📥 使用 Vercel Blob 存储读取数据")
                 if force_refresh:
-                    print("强制刷新：清除内存缓存并重新从 Blob 读取")
+                    print("🔄 强制刷新：清除内存缓存并重新从 Blob 读取")
                     # 清除可能的内存缓存
                     if hasattr(self, '_memory_storage'):
                         self._memory_storage.pop('repos', None)
                 return self._get_from_blob('repos')
             elif self.storage_type == 'memory':
-                print("使用内存存储")
+                print("📥 使用内存存储读取数据")
+                return self._get_from_memory('repos')
+            elif self.is_vercel:
+                # Vercel 环境下不能使用文件存储
+                print(f"⚠️ Vercel 环境不支持文件存储，使用内存存储")
                 return self._get_from_memory('repos')
             else:
-                print("使用文件存储")
+                print("📥 使用文件存储读取数据")
                 return self._get_from_file('repos')
         except Exception as e:
-            print(f"获取仓库数据失败: {e}")
+            print(f"❌ 获取仓库数据失败: {e}")
+            import traceback
+            traceback.print_exc()
             return self._fallback_data
     
     def get_user_repos(self, username: str, is_admin: bool = False) -> Dict[str, Any]:
@@ -125,16 +148,29 @@ class StorageManager:
     def save_repos(self, data: Dict[str, Any]) -> bool:
         """保存仓库列表"""
         try:
+            print(f"💾 开始保存仓库数据 (存储类型: {self.storage_type})")
+            
             if self.storage_type == 'vercel_kv' and self.kv_url and self.kv_token:
+                print(f"📤 使用 Vercel KV 保存数据")
                 return self._save_to_kv('repos', data)
             elif self.storage_type == 'vercel_blob' and self.blob_token:
+                print(f"📤 使用 Vercel Blob 保存数据")
                 return self._save_to_blob('repos', data)
             elif self.storage_type == 'memory':
+                print(f"📤 使用内存保存数据 (⚠️ 数据不持久化)")
+                return self._save_to_memory('repos', data)
+            elif self.is_vercel:
+                # Vercel 环境下不能使用文件存储
+                print(f"❌ Vercel 环境不支持文件存储，请配置 KV_REST_API_URL 和 KV_REST_API_TOKEN")
+                print(f"⚠️ 降级到内存存储，数据将在重启后丢失")
                 return self._save_to_memory('repos', data)
             else:
+                print(f"📤 使用文件存储保存数据")
                 return self._save_to_file('repos', data)
         except Exception as e:
-            print(f"保存仓库数据失败: {e}")
+            print(f"❌ 保存仓库数据失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
